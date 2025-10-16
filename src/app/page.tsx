@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 
+// Define the shape of weather data used in state
 interface WeatherData {
   morningTemp: number;
   afternoonTemp: number;
@@ -12,22 +13,34 @@ interface WeatherData {
 }
 
 export default function Home() {
+  // State to hold weather information
   const [weather, setWeather] = useState<WeatherData | null>(null);
 
   useEffect(() => {
+    // Fetch weather data and update state
     async function getWeather() {
+      // Call Open-Meteo API for hourly weather data
       const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=52.2053&longitude=0.1218&hourly=temperature_2m,precipitation,weathercode&timezone=Europe/London');
       const data = await res.json();
 
-      // Get hours for 8:00am and 5pm (in UTC adjusted)
-      const morningIndex = data.hourly.time.indexOf(`${new Date().toISOString().split('T')[0]}T08:00`);
-      const afternoonIndex = data.hourly.time.indexOf(`${new Date().toISOString().split('T')[0]}T17:00`);
+      // Get today's date in YYYY-MM-DD format
+      const today = new Date().toISOString().split('T')[0];
 
-      const morningTemp = data.hourly.temperature_2m[morningIndex];
-      const afternoonTemp = data.hourly.temperature_2m[afternoonIndex];
-      const morningRain = data.hourly.precipitation[morningIndex];
-      const afternoonRain = data.hourly.precipitation[afternoonIndex];
+      // Find indices for 8:00am and 5:00pm in the hourly data
+      const times = data.hourly.time;
+      const morningIndex = times.indexOf(`${today}T08:00`);
+      const afternoonIndex = times.indexOf(`${today}T17:00`);
 
+      // Destructure relevant arrays for easier access
+      const { temperature_2m, precipitation, weathercode } = data.hourly;
+
+      // Get temperature and precipitation for morning and afternoon
+      const morningTemp = temperature_2m[morningIndex];
+      const afternoonTemp = temperature_2m[afternoonIndex];
+      const morningRain = precipitation[morningIndex];
+      const afternoonRain = precipitation[afternoonIndex];
+
+      // Convert weather code to human-readable condition
       const codeToCondition = (code: number) => {
         if ([0].includes(code)) return 'Clear';
         if ([1, 2, 3].includes(code)) return 'Cloudy';
@@ -36,10 +49,11 @@ export default function Home() {
         return 'Other';
       };
 
-      const morningCondition = codeToCondition(data.hourly.weathercode[morningIndex]);
-      const afternoonCondition = codeToCondition(data.hourly.weathercode[afternoonIndex]);
+      // Get weather condition for morning and afternoon
+      const morningCondition = codeToCondition(weathercode[morningIndex]);
+      const afternoonCondition = codeToCondition(weathercode[afternoonIndex]);
 
-      // Determine coat advice
+      // Determine coat advice based on weather
       let coatAdvice = 'No need to bring a coat :)';
       if (morningRain > 0 || afternoonRain > 0 || morningTemp < 10 || afternoonTemp < 10) {
         coatAdvice = 'Bring a Coat';
@@ -50,6 +64,7 @@ export default function Home() {
         coatAdvice = 'Coat recommended but not necessary';
       }
 
+      // Update state with weather data
       setWeather({
         morningTemp,
         afternoonTemp,
@@ -61,11 +76,14 @@ export default function Home() {
       });
     }
 
+    // Trigger weather fetch on mount
     getWeather();
   }, []);
 
+  // Show loading message while weather data is being fetched
   if (!weather) return <p className="text-center mt-20">Loading weather data...</p>;
 
+  // Render weather information and coat advice
   return (
     <main className="flex flex-col justify-center items-center min-h-screen text-center bg-white text-black">
       <h1 className="text-3xl font-bold mb-4">Do I Need a Coat? 🧥</h1>
