@@ -71,8 +71,8 @@ export default function Home() {
       <h1 className="text-3xl font-bold mb-4">Do I Need a Coat? 🧥</h1>
 
       <div className="bg-gray-100 shadow-md rounded-2xl p-6 w-full max-w-md sm:max-w-lg md:max-w-xl">
-        <p><strong>Morning (8–10am):</strong> {weather.morningCondition}, {weather.morningTemp}°C, rain {weather.morningRain}mm</p>
-        <p><strong>Afternoon (4–6pm):</strong> {weather.afternoonCondition}, {weather.afternoonTemp}°C, rain {weather.afternoonRain}mm</p>
+        <p><strong>Morning (8-10am):</strong> {weather.morningCondition}, {weather.morningTemp}°C, rain {weather.morningRain}mm</p>
+        <p><strong>Afternoon (4-6pm):</strong> {weather.afternoonCondition}, {weather.afternoonTemp}°C, rain {weather.afternoonRain}mm</p>
         <hr className="my-4" />
         <p className="text-xl font-semibold">{weather.coatAdvice}</p>
       </div>
