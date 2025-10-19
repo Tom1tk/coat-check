@@ -1,6 +1,6 @@
 // app/components/RainViewerBackground.tsx
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { JSX, useEffect, useState } from "react";
 
 const TILE_SIZE = 256;
 const CAMBRIDGE_LAT = 52.2053;
@@ -22,7 +22,7 @@ export default function RainViewerBackground(): JSX.Element {
     const n = Math.pow(2, zoom);
     const x = ((lon + 180) / 360) * n;
     const y = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
-    return { x, y };
+    return { x, y }
   };
 
   useEffect(() => {
