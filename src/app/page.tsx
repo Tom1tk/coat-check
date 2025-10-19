@@ -52,7 +52,7 @@ export default function Home() {
     const morningCondition = codeToCondition(weathercode[morningIndex]);
     const afternoonCondition = codeToCondition(weathercode[afternoonIndex]);
 
-    let coatAdvice = 'No need to bring a coat :)';
+    let coatAdvice = 'No need to bring a coat';
     if (morningRain > 0 || afternoonRain > 0 || morningTemp < 10 || afternoonTemp < 10) {
       coatAdvice = 'Bring a coat';
     } else if (
