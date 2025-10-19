@@ -1,105 +1,137 @@
+// app/components/RainViewerBackground.tsx
 "use client";
 import React, { useEffect, useState } from "react";
 
-const RainViewerBackground: React.FC = () => {
-  const [tiles, setTiles] = useState<
-    { base: string; rain: string; x: number; y: number }[]
-  >([]);
+const TILE_SIZE = 256;
+const CAMBRIDGE_LAT = 52.2053;
+const CAMBRIDGE_LON = 0.1218;
+const ZOOM = 8;
 
-  // Converts latitude/longitude → tile coordinates
+// Grid size (16:9 look)
+const GRID_W = 17;
+const GRID_H = 9;
+
+// Move west by this many tiles (negative = west, positive = east)
+const WEST_OFFSET = -1;
+
+export default function RainViewerBackground(): JSX.Element {
+  const [tiles, setTiles] = useState<{ x: number; y: number; left: number; top: number }[]>([]);
+
   const latLonToTile = (lat: number, lon: number, zoom: number) => {
     const latRad = (lat * Math.PI) / 180;
     const n = Math.pow(2, zoom);
     const x = ((lon + 180) / 360) * n;
-    const y =
-      (1 -
-        Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) /
-      2 *
-      n;
+    const y = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
     return { x, y };
   };
 
   useEffect(() => {
-    const apiKey = process.env.NEXT_PUBLIC_OWM_API_KEY;
-    const zoom = 12;
-    const lat = 52.2053; // Cambridge
-    const lon = 0.1218;
-
-    const { x, y } = latLonToTile(lat, lon, zoom);
+    const { x, y } = latLonToTile(CAMBRIDGE_LAT, CAMBRIDGE_LON, ZOOM);
     const xi = Math.floor(x);
     const yi = Math.floor(y);
 
-    const tileSize = 256;
+    const offsetX = (x - xi) * TILE_SIZE;
+    const offsetY = (y - yi) * TILE_SIZE;
 
-    // Adjust grid size (16 wide x 9 tall)
-    const gridWidth = 16;
-    const gridHeight = 9;
+    const containerWidth = GRID_W * TILE_SIZE;
+    const containerHeight = GRID_H * TILE_SIZE;
+    const centerPixelX = (containerWidth / 2) - (TILE_SIZE / 2);
+    const centerPixelY = (containerHeight / 2) - (TILE_SIZE / 2);
 
-    // Calculate offsets to center the view on Cambridge
-    const halfW = Math.floor(gridWidth / 2);
-    const halfH = Math.floor(gridHeight / 2);
+    const halfW = Math.floor(GRID_W / 2);
+    const halfH = Math.floor(GRID_H / 2);
 
-    const newTiles: {
-      base: string;
-      rain: string;
-      x: number;
-      y: number;
-    }[] = [];
+    const t: { x: number; y: number; left: number; top: number }[] = [];
 
     for (let dx = -halfW; dx <= halfW; dx++) {
       for (let dy = -halfH; dy <= halfH; dy++) {
-        newTiles.push({
-          base: `https://tile.openstreetmap.org/${zoom}/${xi + dx}/${yi + dy}.png`,
-          rain: `https://tile.openweathermap.org/map/precipitation_new/${zoom}/${xi + dx}/${yi + dy}.png?appid=${apiKey}`,
-          x: dx * tileSize,
-          y: dy * tileSize,
-        });
+        const tileX = xi + dx + WEST_OFFSET; // Shift west by 3 tiles
+        const tileY = yi + dy;
+
+        const left = centerPixelX + dx * TILE_SIZE - offsetX;
+        const top = centerPixelY + dy * TILE_SIZE - offsetY;
+
+        t.push({ x: tileX, y: tileY, left, top });
       }
     }
 
-    setTiles(newTiles);
+    setTiles(t);
   }, []);
+
+  if (!tiles.length) return <div style={{ position: "absolute", inset: 0, zIndex: -10, pointerEvents: "none" }} />;
+
+  const containerWidth = GRID_W * TILE_SIZE;
+  const containerHeight = GRID_H * TILE_SIZE;
 
   return (
     <div
+      aria-hidden
       style={{
         position: "absolute",
         inset: 0,
+        zIndex: -10,
         overflow: "hidden",
-        zIndex: -1,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "#f8f8f8",
+        pointerEvents: "none",
+        backgroundColor: "#d0d8e0",
       }}
     >
       <div
         style={{
-          position: "relative",
-          width: 256 * 16,
-          height: 256 * 9,
-          filter: "brightness(1.1)",
+          position: "absolute",
+          left: "50%",
+          top: "50%",
+          width: containerWidth,
+          height: containerHeight,
+          transform: "translate(-50%, -50%)",
+          willChange: "transform, opacity",
           opacity: 0.9,
         }}
       >
-        {tiles.map((t, i) => (
-          <div
-            key={i}
+        {/* Base Map (OpenStreetMap) */}
+        {tiles.map((tile, i) => (
+          <img
+            key={`base-${i}`}
+            src={`https://tile.openstreetmap.org/${ZOOM}/${tile.x}/${tile.y}.png`}
+            alt=""
             style={{
               position: "absolute",
-              top: t.y + 256 * 4.5, // center vertically
-              left: t.x + 256 * 8, // center horizontally
-              width: 256,
-              height: 256,
-              backgroundImage: `url(${t.base}), url(${t.rain})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
+              left: Math.round(tile.left),
+              top: Math.round(tile.top),
+              width: TILE_SIZE,
+              height: TILE_SIZE,
+              objectFit: "cover",
+              display: "block",
+              userSelect: "none",
+              pointerEvents: "none",
+              filter: "grayscale(80%) brightness(1.12) contrast(1.05)",
+              opacity: 0.7,
+            }}
+          />
+        ))}
+
+        {/* Rain Overlay (OpenWeatherMap) */}
+        {tiles.map((tile, i) => (
+          <img
+            key={`rain-${i}`}
+            src={`https://tile.openweathermap.org/map/precipitation_new/${ZOOM}/${tile.x}/${tile.y}.png?appid=${process.env.NEXT_PUBLIC_OWM_API_KEY}`}
+            alt=""
+            style={{
+              position: "absolute",
+              left: Math.round(tile.left),
+              top: Math.round(tile.top),
+              width: TILE_SIZE,
+              height: TILE_SIZE,
+              objectFit: "cover",
+              display: "block",
+              userSelect: "none",
+              pointerEvents: "none",
+              filter: "brightness(1.12) contrast(1.05)",
+              opacity: 0.8,
+              mixBlendMode: "multiply",
             }}
           />
         ))}
       </div>
     </div>
   );
-};
-
-export default RainViewerBackground;
+}

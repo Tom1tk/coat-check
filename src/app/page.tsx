@@ -93,7 +93,7 @@ export default function Home() {
       <main className="flex flex-col justify-center items-center min-h-screen text-center bg-transparent text-black">
         <h1 className="text-3xl font-bold mb-4">Do I Need a Coat today? 🧥</h1>
 
-        <div className="bg-gray-100 shadow-md rounded-2xl p-6 w-full max-w-md sm:max-w-lg md:max-w-xl">
+        <div className="bg-gray-100/60 shadow-md rounded-2xl p-6 w-full max-w-md sm:max-w-lg md:max-w-xl">
           <p><strong>Morning (8:00am):</strong> {weather.morningCondition}, {weather.morningTemp}°C, rain {weather.morningRain}mm</p>
           <p><strong>Afternoon (5pm):</strong> {weather.afternoonCondition}, {weather.afternoonTemp}°C, rain {weather.afternoonRain}mm</p>
           <hr className="my-4" />
