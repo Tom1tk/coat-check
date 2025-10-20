@@ -26,7 +26,7 @@ export default function Home() {
   const [mapLoaded, setMapLoaded] = useState(false);
 
   // Durations and delays (adjust to tweak pacing)
-  const FADE_DURATION = 500; // ms
+  const FADE_DURATION = 600; // ms
   const STEP_DELAY = 200; // ms between stages
 
   const allWeatherLoaded = todayWeather !== null && tomorrowWeather !== null;
