@@ -196,6 +196,14 @@ export default function Home() {
                 : `${tomorrowWeather!.coatAdvice} tomorrow`}
             </p>
           </main>
+          {/* Manual Refresh Button */}
+          <button
+            onClick={() => window.location.reload()} // full page reload
+            className="fixed bottom-4 right-4 bg-white/60 hover:bg-blue-100/60 text-black font-bold py-2 px-4 rounded-full shadow-lg transition-colors duration-200 z-50"
+            title="Refresh weather and map"
+          >
+            🔄 Refresh
+          </button>
         </>
       )}
     </div>
