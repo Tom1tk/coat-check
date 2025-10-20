@@ -18,7 +18,20 @@ export default function Home() {
   const [displayDay, setDisplayDay] = useState<'today' | 'tomorrow'>('today');
   const [fade, setFade] = useState(false);
 
-  // Utility function to convert weather code to human-readable condition
+  // Staged fade controls
+  const [loadingTextVisible, setLoadingTextVisible] = useState(true);
+  const [backgroundVisible, setBackgroundVisible] = useState(false);
+  const [pageVisible, setPageVisible] = useState(false);
+
+  const [mapLoaded, setMapLoaded] = useState(false);
+
+  // Durations and delays (adjust to tweak pacing)
+  const FADE_DURATION = 500; // ms
+  const STEP_DELAY = 200; // ms between stages
+
+  const allWeatherLoaded = todayWeather !== null && tomorrowWeather !== null;
+  const allReady = allWeatherLoaded && mapLoaded;
+
   const codeToCondition = (code: number) => {
     if ([0].includes(code)) return 'Clear';
     if ([1, 2, 3].includes(code)) return 'Cloudy';
@@ -27,7 +40,6 @@ export default function Home() {
     return 'Other';
   };
 
-  // Fetch weather for a specific day
   const fetchWeatherForDay = async (dayOffset: number): Promise<WeatherData> => {
     const res = await fetch(
       'https://api.open-meteo.com/v1/forecast?latitude=52.2053&longitude=0.1218&hourly=temperature_2m,precipitation,weathercode&timezone=Europe/London'
@@ -73,7 +85,6 @@ export default function Home() {
     };
   };
 
-  // Pre-fetch both today's and tomorrow's weather on mount
   useEffect(() => {
     const fetchAllWeather = async () => {
       const today = await fetchWeatherForDay(0);
@@ -84,60 +95,109 @@ export default function Home() {
     fetchAllWeather();
   }, []);
 
-  // Function to handle click on title to toggle day with fade effect
   const handleDayToggle = () => {
-    setFade(true); // start fade-out
+    setFade(true);
     setTimeout(() => {
-      setDisplayDay(displayDay === 'today' ? 'tomorrow' : 'today'); // change day
-      setFade(false); // fade back in
-    }, 200); // match duration of CSS transition
+      setDisplayDay(displayDay === 'today' ? 'tomorrow' : 'today');
+      setFade(false);
+    }, 200);
   };
 
-  const currentWeather = displayDay === 'today' ? todayWeather : tomorrowWeather;
-
-  if (!currentWeather) return <p className="text-center mt-20">Loading weather data...</p>;
+  // 🌟 Staged fade sequence when everything is ready
+  useEffect(() => {
+    if (allReady) {
+      // Fade out loading text
+      setTimeout(() => setLoadingTextVisible(false), STEP_DELAY);
+      // Fade in background after a short delay
+      setTimeout(() => setBackgroundVisible(true), STEP_DELAY * 2);
+      // Fade in main content last
+      setTimeout(() => setPageVisible(true), STEP_DELAY * 3);
+    }
+  }, [allReady]);
 
   return (
     <div className="relative min-h-screen flex flex-col items-center justify-center bg-transparent">
-      <RainViewerBackground />
-
-      {/* Title Section */}
-      <header className="mb-6 text-center transition-opacity duration-200">
-        <h1
-          className={`text-3xl font-bold text-black ${
-            fade ? 'opacity-0' : 'opacity-100'
-          }`}
-        >
-          Do I Need a Coat{' '}
-          <span
-            className="underline cursor-pointer"
-            onClick={handleDayToggle}
-          >
-            {displayDay === 'today' ? 'Today' : 'Tomorrow'}
-          </span>
-          ? 🧥
-        </h1>
-      </header>
-
-      {/* Weather Info Box */}
-      <main
-        className={`bg-gray-100/60 shadow-md rounded-2xl p-6 w-full max-w-md text-center text-black mx-auto transition-opacity duration-200 ${
-          fade ? 'opacity-0' : 'opacity-100'
+      {/* Map always rendered, just hidden until fade-in */}
+      <div
+        className={`transition-opacity duration-[${FADE_DURATION}ms] ${
+          backgroundVisible ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        <p>
-          <strong>Morning (8:00am):</strong> {currentWeather.morningCondition},{' '}
-          {currentWeather.morningTemp}°C, rain {currentWeather.morningRain}mm
-        </p>
-        <p>
-          <strong>Afternoon (5pm):</strong> {currentWeather.afternoonCondition},{' '}
-          {currentWeather.afternoonTemp}°C, rain {currentWeather.afternoonRain}mm
-        </p>
-        <hr className="my-4" />
-        <p className="text-xl font-semibold">
-          {currentWeather.coatAdvice} {displayDay}
-        </p>
-      </main>
+        <RainViewerBackground onLoaded={() => setMapLoaded(true)} />
+      </div>
+
+      {/* Loading Screen */}
+      {!pageVisible && (
+        <div
+          className={`absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-blue-200 to-blue-300 text-black z-50 transition-opacity duration-[${FADE_DURATION}ms] ${
+            loadingTextVisible ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          <p className="text-2xl font-semibold animate-pulse">Loading weather data...</p>
+        </div>
+      )}
+
+      {/* Main Page Content */}
+      {allReady && (
+        <>
+          <header
+            className={`mb-6 text-center transition-opacity duration-[${FADE_DURATION}ms] ${
+              pageVisible ? (fade ? 'opacity-0' : 'opacity-100') : 'opacity-0'
+            }`}
+          >
+            <h1 className="text-3xl font-bold text-black">
+              Do I Need a Coat{' '}
+              <span className="underline cursor-pointer" onClick={handleDayToggle}>
+                {displayDay === 'today' ? 'Today' : 'Tomorrow'}
+              </span>
+              ? 🧥
+            </h1>
+          </header>
+
+          <main
+            className={`bg-gray-100/60 shadow-md rounded-2xl p-6 w-full max-w-md text-center text-black mx-auto transition-opacity duration-[${FADE_DURATION}ms] ${
+              pageVisible ? (fade ? 'opacity-0' : 'opacity-100') : 'opacity-0'
+            }`}
+          >
+            <p>
+              <strong>Morning (8:00am):</strong>{' '}
+              {displayDay === 'today'
+                ? todayWeather!.morningCondition
+                : tomorrowWeather!.morningCondition}
+              ,{' '}
+              {displayDay === 'today'
+                ? todayWeather!.morningTemp
+                : tomorrowWeather!.morningTemp}
+              °C, rain{' '}
+              {displayDay === 'today'
+                ? todayWeather!.morningRain
+                : tomorrowWeather!.morningRain}
+              mm
+            </p>
+            <p>
+              <strong>Afternoon (5pm):</strong>{' '}
+              {displayDay === 'today'
+                ? todayWeather!.afternoonCondition
+                : tomorrowWeather!.afternoonCondition}
+              ,{' '}
+              {displayDay === 'today'
+                ? todayWeather!.afternoonTemp
+                : tomorrowWeather!.afternoonTemp}
+              °C, rain{' '}
+              {displayDay === 'today'
+                ? todayWeather!.afternoonRain
+                : tomorrowWeather!.afternoonRain}
+              mm
+            </p>
+            <hr className="my-4" />
+            <p className="text-xl font-semibold">
+              {displayDay === 'today'
+                ? `${todayWeather!.coatAdvice} today`
+                : `${tomorrowWeather!.coatAdvice} tomorrow`}
+            </p>
+          </main>
+        </>
+      )}
     </div>
   );
 }
