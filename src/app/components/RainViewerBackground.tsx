@@ -123,7 +123,8 @@ export default function RainViewerBackground({
               width: TILE_SIZE,
               height: TILE_SIZE,
               mixBlendMode: "multiply",
-              opacity: 0.8,
+              opacity: 1,
+              filter: 'brightness(1.2) contrast(1.2)',
             }}
           />
         ))}
