@@ -12,7 +12,48 @@ interface WeatherData {
   coatAdvice: string;
 }
 
+interface Location {
+  name: string;
+  latitude: number;
+  longitude: number;
+}
+
+
 export default function Home() {
+
+  const [savedCity, setSavedCity] = useState<string>("");
+  
+  useEffect(() => {
+  // Only runs in the browser
+  const stored = localStorage.getItem("userCity");
+  if (stored) setSavedCity(stored);
+  }, []);
+  
+  const handleSaveCity = (city: string) => {
+  setSavedCity(city);
+  if (typeof window !== "undefined") {
+    localStorage.setItem("userCity", city);
+  }
+  };
+
+
+  // 🌍 Location state
+  const [location, setLocation] = useState<Location>(
+    () =>
+      JSON.parse(localStorage.getItem('location') || 'null') || {
+        name: 'Cambridge',
+        latitude: 52.2053,
+        longitude: 0.1218,
+      }
+  );
+  const [searchVisible, setSearchVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loadingLocation, setLoadingLocation] = useState(false);
+
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // Weather states
   const [todayWeather, setTodayWeather] = useState<WeatherData | null>(null);
   const [tomorrowWeather, setTomorrowWeather] = useState<WeatherData | null>(null);
   const [displayDay, setDisplayDay] = useState<'today' | 'tomorrow'>('today');
@@ -21,39 +62,36 @@ export default function Home() {
   // Auto refresh countdown timer (in minutes)
   const [minutesLeft, setMinutesLeft] = useState<number | null>(null);
 
-  // Set up countdown + full refresh at X:01 every hour
-  useEffect(() => {
-    const updateTimer = () => {
-      const now = new Date();
-      const nextHour = new Date(now);
-      nextHour.setHours(now.getMinutes() >= 1 ? now.getHours() + 1 : now.getHours());
-      nextHour.setMinutes(1, 0, 0); // Always refresh at HH:01:00
-
-      const diffMs = nextHour.getTime() - now.getTime();
-      const diffMinutes = Math.max(0, Math.floor(diffMs / 60000));
-      setMinutesLeft(diffMinutes);
-
-      // If it's exactly the refresh time, reload the page
-      if (now.getMinutes() === 1 && now.getSeconds() === 0) {
-        window.location.reload();
-      }
-    };
-
-    updateTimer(); // Run immediately
-    const interval = setInterval(updateTimer, 1000); // Update every second
-    return () => clearInterval(interval);
-  }, []);
-
   // Staged fade controls
   const [loadingTextVisible, setLoadingTextVisible] = useState(true);
   const [backgroundVisible, setBackgroundVisible] = useState(false);
   const [pageVisible, setPageVisible] = useState(false);
-
   const [mapLoaded, setMapLoaded] = useState(false);
 
   // Durations and delays (adjust to tweak pacing)
   const FADE_DURATION = 600; // ms
   const STEP_DELAY = 200; // ms between stages
+
+  // Countdown + full refresh at X:01 every hour
+  useEffect(() => {
+    const updateTimer = () => {
+      const now = new Date();
+      const nextHour = new Date(now);
+      nextHour.setHours(now.getMinutes() >= 1 ? now.getHours() + 1 : now.getHours());
+      nextHour.setMinutes(1, 0, 0);
+
+      const diffMs = nextHour.getTime() - now.getTime();
+      const diffMinutes = Math.max(0, Math.floor(diffMs / 60000));
+      setMinutesLeft(diffMinutes);
+
+      if (now.getMinutes() === 1 && now.getSeconds() === 0) {
+        window.location.reload();
+      }
+    };
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const allWeatherLoaded = todayWeather !== null && tomorrowWeather !== null;
   const allReady = allWeatherLoaded && mapLoaded;
@@ -67,8 +105,9 @@ export default function Home() {
   };
 
   const fetchWeatherForDay = async (dayOffset: number): Promise<WeatherData> => {
+    const { latitude, longitude } = location;
     const res = await fetch(
-      'https://api.open-meteo.com/v1/forecast?latitude=52.2053&longitude=0.1218&hourly=temperature_2m,precipitation,weathercode&timezone=Europe/London'
+      `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,precipitation,weathercode&timezone=Europe/London`
     );
     const data = await res.json();
 
@@ -119,7 +158,7 @@ export default function Home() {
       setTomorrowWeather(tomorrow);
     };
     fetchAllWeather();
-  }, []);
+  }, [location]);
 
   const handleDayToggle = () => {
     setFade(true);
@@ -129,27 +168,26 @@ export default function Home() {
     }, 200);
   };
 
-  // 🌟 Staged fade sequence when everything is ready
+  // 🌟 Staged fade sequence
   useEffect(() => {
     if (allReady) {
-      // Fade out loading text
       setTimeout(() => setLoadingTextVisible(false), STEP_DELAY);
-      // Fade in background after a short delay
       setTimeout(() => setBackgroundVisible(true), STEP_DELAY * 2);
-      // Fade in main content last
       setTimeout(() => setPageVisible(true), STEP_DELAY * 3);
     }
   }, [allReady]);
 
+  const currentWeather = displayDay === 'today' ? todayWeather : tomorrowWeather;
+
   return (
     <div className="relative min-h-screen flex flex-col items-center justify-center bg-transparent">
-      {/* Map always rendered, just hidden until fade-in */}
+      {/* Map */}
       <div
         className={`transition-opacity duration-[${FADE_DURATION}ms] ${
           backgroundVisible ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        <RainViewerBackground onLoaded={() => setMapLoaded(true)} />
+        <RainViewerBackground location={location} onLoaded={() => setMapLoaded(true)} />
       </div>
 
       {/* Loading Screen */}
@@ -163,11 +201,11 @@ export default function Home() {
         </div>
       )}
 
-      {/* Main Page Content */}
-      {allReady && (
+      {/* Main Content */}
+      {allReady && currentWeather && (
         <>
           <header
-            className={`mb-6 text-center transition-opacity duration-[${FADE_DURATION}ms] ${
+            className={`mb-2 text-center transition-opacity duration-[${FADE_DURATION}ms] ${
               pageVisible ? (fade ? 'opacity-0' : 'opacity-100') : 'opacity-0'
             }`}
           >
@@ -178,7 +216,113 @@ export default function Home() {
               </span>
               ? 🧥
             </h1>
+
+            {/* 📍 Change Location */}
+            <div className="mt-2 flex flex-col text-black items-center">
+              <button
+                onClick={() => setSearchVisible(!searchVisible)}
+                className="underline hover:text-grey"
+              >
+                📍 Current Location - {location.name}
+              </button>
+
+              {searchVisible && (
+                <div className="mt-2 flex flex-col items-center bg-white/70 p-3 rounded-xl shadow-lg w-64">
+                  <input
+                    type="text"
+                    placeholder="Enter city name..."
+                    value={searchQuery}
+                    onChange={async (e) => {
+                      setSearchQuery(e.target.value);
+                      setErrorMessage('');
+                      if (e.target.value.length < 2) {
+                        setSuggestions([]);
+                        return;
+                      }
+                      try {
+                        const res = await fetch(
+                          `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
+                            e.target.value
+                          )}&count=5`
+                        );
+                        const data = await res.json();
+                        if (data.results) setSuggestions(data.results);
+                        else setSuggestions([]);
+                      } catch (err) {
+                        console.error(err);
+                        setSuggestions([]);
+                      }
+                    }}
+                    className="border border-gray-300 rounded-md p-2 w-full"
+                  />
+
+                  {/* Suggestions dropdown */}
+                  {suggestions.length > 0 && (
+                    <ul className="mt-1 max-h-40 overflow-y-auto w-full border border-gray-300 rounded-md bg-white">
+                      {suggestions.map((s, i) => (
+                        <li
+                          key={i}
+                          className="p-2 cursor-pointer hover:bg-blue-100"
+                          onClick={() => {
+                            const newLoc = {
+                              name: s.name,
+                              latitude: s.latitude,
+                              longitude: s.longitude,
+                            };
+                            setLocation(newLoc);
+                            localStorage.setItem('location', JSON.stringify(newLoc));
+                            window.location.reload();
+                          }}
+                        >
+                          {s.name}, {s.country}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {/* Manual search button & error message */}
+                  <button
+                    onClick={async () => {
+                      if (!searchQuery) return;
+                      setLoadingLocation(true);
+                      try {
+                        const res = await fetch(
+                          `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
+                            searchQuery
+                          )}&count=1`
+                        );
+                        const data = await res.json();
+                        if (data.results && data.results.length > 0) {
+                          const loc = data.results[0];
+                          const newLoc = {
+                            name: loc.name,
+                            latitude: loc.latitude,
+                            longitude: loc.longitude,
+                          };
+                          setLocation(newLoc);
+                          localStorage.setItem('location', JSON.stringify(newLoc));
+                          window.location.reload();
+                        } else {
+                          setErrorMessage('Location not found. Try another search.');
+                        }
+                      } catch (err) {
+                        console.error(err);
+                        setErrorMessage('Error fetching location data.');
+                      } finally {
+                        setLoadingLocation(false);
+                      }
+                    }}
+                    className="bg-blue-500 hover:bg-blue-600 text-black font-semibold py-1 px-3 rounded-md mt-2"
+                  >
+                    {loadingLocation ? 'Searching...' : 'Search'}
+                  </button>
+                  {errorMessage && <p className="text-red-600 mt-1 text-sm">{errorMessage}</p>}
+                </div>
+              )}
+            </div>
           </header>
+
+
 
           <main
             className={`bg-gray-100/60 shadow-md rounded-2xl p-6 w-full max-w-md text-center text-black mx-auto transition-opacity duration-[${FADE_DURATION}ms] ${
@@ -186,59 +330,32 @@ export default function Home() {
             }`}
           >
             <p>
-              <strong>Morning (8:00am):</strong>{' '}
-              {displayDay === 'today'
-                ? todayWeather!.morningCondition
-                : tomorrowWeather!.morningCondition}
-              ,{' '}
-              {displayDay === 'today'
-                ? todayWeather!.morningTemp
-                : tomorrowWeather!.morningTemp}
-              °C, rain{' '}
-              {displayDay === 'today'
-                ? todayWeather!.morningRain
-                : tomorrowWeather!.morningRain}
-              mm
+              <strong>Morning (8:00am):</strong> {currentWeather.morningCondition},{' '}
+              {currentWeather.morningTemp}°C, rain {currentWeather.morningRain}mm
             </p>
             <p>
-              <strong>Afternoon (5pm):</strong>{' '}
-              {displayDay === 'today'
-                ? todayWeather!.afternoonCondition
-                : tomorrowWeather!.afternoonCondition}
-              ,{' '}
-              {displayDay === 'today'
-                ? todayWeather!.afternoonTemp
-                : tomorrowWeather!.afternoonTemp}
-              °C, rain{' '}
-              {displayDay === 'today'
-                ? todayWeather!.afternoonRain
-                : tomorrowWeather!.afternoonRain}
-              mm
+              <strong>Afternoon (5pm):</strong> {currentWeather.afternoonCondition},{' '}
+              {currentWeather.afternoonTemp}°C, rain {currentWeather.afternoonRain}mm
             </p>
             <hr className="my-4" />
             <p className="text-xl font-semibold">
-              {displayDay === 'today'
-                ? `${todayWeather!.coatAdvice} today`
-                : `${tomorrowWeather!.coatAdvice} tomorrow`}
+              {currentWeather.coatAdvice} {displayDay}
             </p>
           </main>
 
-          {/* Manual Refresh Button + Countdown Timer */}
+          {/* Manual Refresh + Countdown */}
           <div
             className={`fixed bottom-4 right-4 flex flex-col items-center space-y-1 transition-opacity duration-500 z-50 ${
               pageVisible ? 'opacity-100' : 'opacity-0'
             }`}
           >
-            {/* Countdown text */}
             <p className="text-xs text-black bg-white/60 px-2 py-1 rounded-md shadow-sm">
               {minutesLeft !== null
                 ? `Auto Refresh in: 0:${minutesLeft.toString().padStart(2, '0')}`
                 : ''}
             </p>
-
-            {/* Refresh button */}
             <button
-              onClick={() => window.location.reload()} // full page reload
+              onClick={() => window.location.reload()}
               className="bg-white/60 hover:bg-blue-100/60 text-black font-bold py-2 px-4 rounded-full shadow-lg"
               title="Refresh weather and map"
             >

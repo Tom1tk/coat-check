@@ -3,18 +3,20 @@
 import React, { JSX, useEffect, useState } from "react";
 
 const TILE_SIZE = 256;
-const CAMBRIDGE_LAT = 52.2053;
-const CAMBRIDGE_LON = 0.1218;
 const ZOOM = 8;
 const GRID_W = 17;
 const GRID_H = 9;
 const WEST_OFFSET = -1;
 
+interface RainViewerBackgroundProps {
+  onLoaded?: () => void;
+  location?: { latitude: number; longitude: number }; // allow dynamic location
+}
+
 export default function RainViewerBackground({
   onLoaded,
-}: {
-  onLoaded?: () => void;
-}): JSX.Element {
+  location = { latitude: 52.2053, longitude: 0.1218 }, // default Cambridge
+}: RainViewerBackgroundProps): JSX.Element {
   const [tiles, setTiles] = useState<{ x: number; y: number; left: number; top: number }[]>([]);
   const [loadedCount, setLoadedCount] = useState(0);
 
@@ -29,7 +31,7 @@ export default function RainViewerBackground({
   };
 
   useEffect(() => {
-    const { x, y } = latLonToTile(CAMBRIDGE_LAT, CAMBRIDGE_LON, ZOOM);
+    const { x, y } = latLonToTile(location.latitude, location.longitude, ZOOM);
     const xi = Math.floor(x);
     const yi = Math.floor(y);
     const offsetX = (x - xi) * TILE_SIZE;
@@ -53,13 +55,13 @@ export default function RainViewerBackground({
       }
     }
     setTiles(t);
-  }, []);
+  }, [location]); // recalc tiles whenever location changes
 
   useEffect(() => {
     if (loadedCount >= totalTiles && onLoaded) {
       onLoaded();
     }
-  }, [loadedCount]);
+  }, [loadedCount, onLoaded]);
 
   if (!tiles.length)
     return <div style={{ position: "absolute", inset: 0, zIndex: -10, pointerEvents: "none" }} />;
@@ -124,7 +126,7 @@ export default function RainViewerBackground({
               height: TILE_SIZE,
               mixBlendMode: "multiply",
               opacity: 1,
-              filter: 'brightness(1.2) contrast(1.2)',
+              filter: "brightness(1.2) contrast(1.2)",
             }}
           />
         ))}
