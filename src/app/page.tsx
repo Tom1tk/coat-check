@@ -18,6 +18,32 @@ export default function Home() {
   const [displayDay, setDisplayDay] = useState<'today' | 'tomorrow'>('today');
   const [fade, setFade] = useState(false);
 
+  // Auto refresh countdown timer (in minutes)
+  const [minutesLeft, setMinutesLeft] = useState<number | null>(null);
+
+  // Set up countdown + full refresh at X:01 every hour
+  useEffect(() => {
+    const updateTimer = () => {
+      const now = new Date();
+      const nextHour = new Date(now);
+      nextHour.setHours(now.getMinutes() >= 1 ? now.getHours() + 1 : now.getHours());
+      nextHour.setMinutes(1, 0, 0); // Always refresh at HH:01:00
+
+      const diffMs = nextHour.getTime() - now.getTime();
+      const diffMinutes = Math.max(0, Math.floor(diffMs / 60000));
+      setMinutesLeft(diffMinutes);
+
+      // If it's exactly the refresh time, reload the page
+      if (now.getMinutes() === 1 && now.getSeconds() === 0) {
+        window.location.reload();
+      }
+    };
+
+    updateTimer(); // Run immediately
+    const interval = setInterval(updateTimer, 1000); // Update every second
+    return () => clearInterval(interval);
+  }, []);
+
   // Staged fade controls
   const [loadingTextVisible, setLoadingTextVisible] = useState(true);
   const [backgroundVisible, setBackgroundVisible] = useState(false);
@@ -196,16 +222,29 @@ export default function Home() {
                 : `${tomorrowWeather!.coatAdvice} tomorrow`}
             </p>
           </main>
-          {/* Manual Refresh Button */}
-          <button
-            onClick={() => window.location.reload()} // full page reload
-            className={`fixed bottom-4 right-4 bg-white/60 hover:bg-blue-100/60 text-black font-bold py-2 px-4 rounded-full shadow-lg transition-opacity duration-500 z-50 ${
-                pageVisible ? 'opacity-100' : 'opacity-0'
+
+          {/* Manual Refresh Button + Countdown Timer */}
+          <div
+            className={`fixed bottom-4 right-4 flex flex-col items-center space-y-1 transition-opacity duration-500 z-50 ${
+              pageVisible ? 'opacity-100' : 'opacity-0'
             }`}
-            title="Refresh weather and map"
           >
-            🔄 Refresh
-          </button>
+            {/* Countdown text */}
+            <p className="text-xs text-black bg-white/60 px-2 py-1 rounded-md shadow-sm">
+              {minutesLeft !== null
+                ? `Auto Refresh in: 0:${minutesLeft.toString().padStart(2, '0')}`
+                : ''}
+            </p>
+
+            {/* Refresh button */}
+            <button
+              onClick={() => window.location.reload()} // full page reload
+              className="bg-white/60 hover:bg-blue-100/60 text-black font-bold py-2 px-4 rounded-full shadow-lg"
+              title="Refresh weather and map"
+            >
+              🔄 Refresh
+            </button>
+          </div>
         </>
       )}
     </div>
