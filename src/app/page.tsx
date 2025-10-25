@@ -24,23 +24,10 @@ export default function Home() {
   const [savedCity, setSavedCity] = useState<string>("");
   
   useEffect(() => {
-  // Only runs in the browser
-  const stored = localStorage.getItem("userCity");
-  if (stored) setSavedCity(stored);
-  }, []);
-
-  // Load location from localStorage on component mount
-  useEffect(() => {
+    // Only runs in the browser
     if (typeof window !== 'undefined') {
-      const storedLocation = localStorage.getItem('location');
-      if (storedLocation) {
-        try {
-          const parsedLocation = JSON.parse(storedLocation);
-          setLocation(parsedLocation);
-        } catch (error) {
-          console.error('Error parsing stored location:', error);
-        }
-      }
+      const stored = localStorage.getItem("userCity");
+      if (stored) setSavedCity(stored);
     }
   }, []);
   
@@ -53,10 +40,23 @@ export default function Home() {
 
 
   // 🌍 Location state
-  const [location, setLocation] = useState<Location>({
-    name: 'Cambridge',
-    latitude: 52.2053,
-    longitude: 0.1218,
+  const [location, setLocation] = useState<Location>(() => {
+    // Only access localStorage in the browser
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('location');
+        if (stored) {
+          return JSON.parse(stored);
+        }
+      } catch (error) {
+        console.error('Error parsing stored location:', error);
+      }
+    }
+    return {
+      name: 'Cambridge',
+      latitude: 52.2053,
+      longitude: 0.1218,
+    };
   });
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
