@@ -12,6 +12,14 @@ interface WeatherData {
   coatAdvice: string;
 }
 
+interface CurrentHourWeather {
+  currentTemp: number;
+  currentRain: number;
+  currentCondition: string;
+  currentHour: string;
+  coatAdvice: string;
+}
+
 interface Location {
   name: string;
   latitude: number;
@@ -59,6 +67,7 @@ export default function Home() {
   // Weather states
   const [todayWeather, setTodayWeather] = useState<WeatherData | null>(null);
   const [tomorrowWeather, setTomorrowWeather] = useState<WeatherData | null>(null);
+  const [currentHourWeather, setCurrentHourWeather] = useState<CurrentHourWeather | null>(null);
   const [displayDay, setDisplayDay] = useState<'today' | 'tomorrow'>('today');
   const [fade, setFade] = useState(false);
 
@@ -96,7 +105,7 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  const allWeatherLoaded = todayWeather !== null && tomorrowWeather !== null;
+  const allWeatherLoaded = currentHourWeather !== null && todayWeather !== null && tomorrowWeather !== null;
   const allReady = allWeatherLoaded && mapLoaded;
 
   const codeToCondition = (code: number) => {
@@ -106,6 +115,45 @@ export default function Home() {
     if ([51, 53, 55, 61, 63, 65].includes(code)) return 'Rain';
     return 'Other';
   };
+
+  const fetchCurrentHourWeather = useCallback(async (): Promise<CurrentHourWeather> => {
+    const { latitude, longitude } = location;
+    const res = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,precipitation,weathercode&timezone=Europe/London`
+    );
+    const data = await res.json();
+
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentTimeStr = now.toISOString().split('T')[0] + `T${currentHour.toString().padStart(2, '0')}:00`;
+
+    const times = data.hourly.time;
+    const currentIndex = times.indexOf(currentTimeStr);
+    
+    // If current hour not found, use the closest available hour
+    const actualIndex = currentIndex !== -1 ? currentIndex : Math.floor(times.length / 2);
+
+    const { temperature_2m, precipitation, weathercode } = data.hourly;
+
+    const currentTemp = temperature_2m[actualIndex];
+    const currentRain = precipitation[actualIndex];
+    const currentCondition = codeToCondition(weathercode[actualIndex]);
+
+    let coatAdvice = 'No need to bring a coat';
+    if (currentRain > 0 || currentTemp < 10) {
+      coatAdvice = 'Bring a coat';
+    } else if (currentTemp >= 10 && currentTemp <= 15 && currentCondition === 'Cloudy') {
+      coatAdvice = 'Coat recommended but not necessary';
+    }
+
+    return {
+      currentTemp,
+      currentRain,
+      currentCondition,
+      currentHour: `${currentHour}:00`,
+      coatAdvice,
+    };
+  }, [location]);
 
   const fetchWeatherForDay = useCallback(async (dayOffset: number): Promise<WeatherData> => {
     const { latitude, longitude } = location;
@@ -155,13 +203,15 @@ export default function Home() {
 
   useEffect(() => {
     const fetchAllWeather = async () => {
+      const current = await fetchCurrentHourWeather();
       const today = await fetchWeatherForDay(0);
       const tomorrow = await fetchWeatherForDay(1);
+      setCurrentHourWeather(current);
       setTodayWeather(today);
       setTomorrowWeather(tomorrow);
     };
     fetchAllWeather();
-  }, [fetchWeatherForDay]);
+  }, [fetchCurrentHourWeather, fetchWeatherForDay]);
 
   const handleDayToggle = () => {
     setFade(true);
@@ -329,10 +379,8 @@ export default function Home() {
             </div>
           </header>
 
-
-
           <main
-            className={`bg-gray-100/60 shadow-md rounded-2xl p-6 w-full max-w-md text-center text-black mx-auto transition-opacity duration-[${FADE_DURATION}ms] ${
+            className={`bg-gray-100/60 shadow-md rounded-2xl p-6 w-full max-w-md text-center text-black mx-auto mb-4 transition-opacity duration-[${FADE_DURATION}ms] ${
               pageVisible ? (fade ? 'opacity-0' : 'opacity-100') : 'opacity-0'
             }`}
           >
@@ -349,6 +397,24 @@ export default function Home() {
               {currentWeather.coatAdvice} {displayDay}
             </p>
           </main>
+
+          {/* Current Hour Weather Box */}
+          {currentHourWeather && (
+            <div
+              className={`bg-gray-100/60 shadow-md rounded-2xl p-6 w-full max-w-md text-center text-black mx-auto transition-opacity duration-[${FADE_DURATION}ms] ${
+                pageVisible ? (fade ? 'opacity-0' : 'opacity-100') : 'opacity-0'
+              }`}
+            >
+              <p>
+                <strong>Current Hour ({currentHourWeather.currentHour}):</strong> {currentHourWeather.currentCondition},{' '}
+                {currentHourWeather.currentTemp}°C, rain {currentHourWeather.currentRain}mm
+              </p>
+              <hr className="my-4" />
+              <p className="text-xl font-semibold">
+                {currentHourWeather.coatAdvice} right now
+              </p>
+            </div>
+          )}
 
           {/* Manual Refresh + Countdown */}
           <div

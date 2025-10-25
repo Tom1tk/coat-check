@@ -1,6 +1,7 @@
 // app/components/RainViewerBackground.tsx
 "use client";
 import React, { JSX, useEffect, useState } from "react";
+import { CachedTileImage } from "./CachedTileImage";
 
 const TILE_SIZE = 256;
 const ZOOM = 8;
@@ -95,7 +96,7 @@ export default function RainViewerBackground({
         }}
       >
         {tiles.map((tile, i) => (
-          <img
+          <CachedTileImage
             key={`base-${i}`}
             src={`https://tile.openstreetmap.org/${ZOOM}/${tile.x}/${tile.y}.png`}
             alt=""
