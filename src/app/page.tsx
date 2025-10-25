@@ -28,6 +28,21 @@ export default function Home() {
   const stored = localStorage.getItem("userCity");
   if (stored) setSavedCity(stored);
   }, []);
+
+  // Load location from localStorage on component mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedLocation = localStorage.getItem('location');
+      if (storedLocation) {
+        try {
+          const parsedLocation = JSON.parse(storedLocation);
+          setLocation(parsedLocation);
+        } catch (error) {
+          console.error('Error parsing stored location:', error);
+        }
+      }
+    }
+  }, []);
   
   const handleSaveCity = (city: string) => {
   setSavedCity(city);
@@ -38,14 +53,11 @@ export default function Home() {
 
 
   // 🌍 Location state
-  const [location, setLocation] = useState<Location>(
-    () =>
-      JSON.parse(localStorage.getItem('location') || 'null') || {
-        name: 'Cambridge',
-        latitude: 52.2053,
-        longitude: 0.1218,
-      }
-  );
+  const [location, setLocation] = useState<Location>({
+    name: 'Cambridge',
+    latitude: 52.2053,
+    longitude: 0.1218,
+  });
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [loadingLocation, setLoadingLocation] = useState(false);
@@ -270,7 +282,9 @@ export default function Home() {
                               longitude: s.longitude,
                             };
                             setLocation(newLoc);
-                            localStorage.setItem('location', JSON.stringify(newLoc));
+                            if (typeof window !== 'undefined') {
+                              localStorage.setItem('location', JSON.stringify(newLoc));
+                            }
                             window.location.reload();
                           }}
                         >
@@ -300,7 +314,9 @@ export default function Home() {
                             longitude: loc.longitude,
                           };
                           setLocation(newLoc);
-                          localStorage.setItem('location', JSON.stringify(newLoc));
+                          if (typeof window !== 'undefined') {
+                            localStorage.setItem('location', JSON.stringify(newLoc));
+                          }
                           window.location.reload();
                         } else {
                           setErrorMessage('Location not found. Try another search.');
