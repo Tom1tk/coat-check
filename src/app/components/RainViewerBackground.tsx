@@ -61,7 +61,7 @@ export default function RainViewerBackground({
     if (loadedCount >= totalTiles && onLoaded) {
       onLoaded();
     }
-  }, [loadedCount, onLoaded]);
+  }, [loadedCount, totalTiles, onLoaded]);
 
   if (!tiles.length)
     return <div style={{ position: "absolute", inset: 0, zIndex: -10, pointerEvents: "none" }} />;

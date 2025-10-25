@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import RainViewerBackground from './components/RainViewerBackground';
 
 interface WeatherData {
@@ -21,22 +21,6 @@ interface Location {
 
 export default function Home() {
 
-  const [savedCity, setSavedCity] = useState<string>("");
-  
-  useEffect(() => {
-    // Only runs in the browser
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem("userCity");
-      if (stored) setSavedCity(stored);
-    }
-  }, []);
-  
-  const handleSaveCity = (city: string) => {
-  setSavedCity(city);
-  if (typeof window !== "undefined") {
-    localStorage.setItem("userCity", city);
-  }
-  };
 
 
   // 🌍 Location state
@@ -62,7 +46,14 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loadingLocation, setLoadingLocation] = useState(false);
 
-  const [suggestions, setSuggestions] = useState<any[]>([]);
+  interface Suggestion {
+    name: string;
+    country: string;
+    latitude: number;
+    longitude: number;
+  }
+  
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
 
   // Weather states
@@ -116,7 +107,7 @@ export default function Home() {
     return 'Other';
   };
 
-  const fetchWeatherForDay = async (dayOffset: number): Promise<WeatherData> => {
+  const fetchWeatherForDay = useCallback(async (dayOffset: number): Promise<WeatherData> => {
     const { latitude, longitude } = location;
     const res = await fetch(
       `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,precipitation,weathercode&timezone=Europe/London`
@@ -160,7 +151,7 @@ export default function Home() {
       afternoonCondition,
       coatAdvice,
     };
-  };
+  }, [location]);
 
   useEffect(() => {
     const fetchAllWeather = async () => {
@@ -170,7 +161,7 @@ export default function Home() {
       setTomorrowWeather(tomorrow);
     };
     fetchAllWeather();
-  }, [location]);
+  }, [fetchWeatherForDay]);
 
   const handleDayToggle = () => {
     setFade(true);
