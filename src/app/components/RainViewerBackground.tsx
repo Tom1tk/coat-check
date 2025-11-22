@@ -2,8 +2,8 @@
 "use client";
 import React, { JSX, useEffect, useState } from "react";
 import { CachedTileImage } from "./CachedTileImage";
+import { latLonToTile, TILE_SIZE } from "../utils/mapUtils";
 
-const TILE_SIZE = 256;
 const ZOOM = 8;
 const GRID_W = 17;
 const GRID_H = 9;
@@ -14,7 +14,7 @@ interface RainViewerBackgroundProps {
   location?: { latitude: number; longitude: number }; // allow dynamic location
 }
 
-export default function RainViewerBackground({
+function RainViewerBackground({
   onLoaded,
   location = { latitude: 52.2053, longitude: 0.1218 }, // default Cambridge
 }: RainViewerBackgroundProps): JSX.Element {
@@ -22,14 +22,6 @@ export default function RainViewerBackground({
   const [loadedCount, setLoadedCount] = useState(0);
 
   const totalTiles = GRID_W * GRID_H * 2; // base + rain layer per tile
-
-  const latLonToTile = (lat: number, lon: number, zoom: number) => {
-    const latRad = (lat * Math.PI) / 180;
-    const n = Math.pow(2, zoom);
-    const x = ((lon + 180) / 360) * n;
-    const y = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
-    return { x, y };
-  };
 
   useEffect(() => {
     const { x, y } = latLonToTile(location.latitude, location.longitude, ZOOM);
@@ -135,3 +127,5 @@ export default function RainViewerBackground({
     </div>
   );
 }
+
+export default React.memo(RainViewerBackground);
