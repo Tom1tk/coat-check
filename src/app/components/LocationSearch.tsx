@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Location, Suggestion } from '../hooks/useLocation';
+import SpotlightCard from './SpotlightCard';
+import SpotlightText from './SpotlightText';
 
 interface LocationSearchProps {
     location: Location;
@@ -17,13 +19,15 @@ export default function LocationSearch({ location, setLocation }: LocationSearch
         <div className="mt-2 flex flex-col text-black items-center">
             <button
                 onClick={() => setSearchVisible(!searchVisible)}
-                className="underline hover:text-grey"
+                className="hover:text-grey"
             >
-                📍 Current Location - {location.name}
+                <SpotlightText className="underline">
+                    📍 Current Location - {location.name}
+                </SpotlightText>
             </button>
 
             {searchVisible && (
-                <div className="mt-2 flex flex-col items-center bg-white/70 p-3 rounded-xl shadow-lg w-64">
+                <SpotlightCard className="mt-2 flex flex-col items-center glass-panel p-3 rounded-xl w-64">
                     <input
                         type="text"
                         placeholder="Enter city name..."
@@ -117,7 +121,7 @@ export default function LocationSearch({ location, setLocation }: LocationSearch
                         {loadingLocation ? 'Searching...' : 'Search'}
                     </button>
                     {errorMessage && <p className="text-red-600 mt-1 text-sm">{errorMessage}</p>}
-                </div>
+                </SpotlightCard>
             )}
         </div>
     );

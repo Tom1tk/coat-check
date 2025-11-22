@@ -1,5 +1,6 @@
 import React from 'react';
 import { CurrentHourWeather } from '../utils/weatherUtils';
+import SpotlightCard from './SpotlightCard';
 
 interface CurrentWeatherCardProps {
     weather: CurrentHourWeather;
@@ -15,8 +16,8 @@ export default function CurrentWeatherCard({
     FADE_DURATION,
 }: CurrentWeatherCardProps) {
     return (
-        <div
-            className={`bg-gray-100/60 shadow-md rounded-2xl p-6 w-full max-w-md text-center text-black mx-auto transition-opacity duration-[${FADE_DURATION}ms] ${pageVisible ? (fade ? 'opacity-0' : 'opacity-100') : 'opacity-0'
+        <SpotlightCard
+            className={`glass-panel rounded-2xl p-6 w-full max-w-md text-center text-black mx-auto transition-opacity duration-[${FADE_DURATION}ms] ${pageVisible ? (fade ? 'opacity-0' : 'opacity-100') : 'opacity-0'
                 }`}
         >
             <p>
@@ -27,6 +28,6 @@ export default function CurrentWeatherCard({
             <p className="text-xl font-semibold">
                 {weather.coatAdvice} right now
             </p>
-        </div>
+        </SpotlightCard>
     );
 }

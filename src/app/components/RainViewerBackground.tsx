@@ -99,8 +99,8 @@ function RainViewerBackground({
               top: tile.top,
               width: TILE_SIZE,
               height: TILE_SIZE,
-              filter: "grayscale(80%) brightness(1.12) contrast(1.05)",
-              opacity: 0.7,
+              filter: "grayscale(100%) brightness(1) contrast(1.2)",
+              opacity: 0.6,
             }}
           />
         ))}

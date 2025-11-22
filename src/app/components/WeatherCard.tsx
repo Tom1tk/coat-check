@@ -1,5 +1,6 @@
 import React from 'react';
 import { WeatherData } from '../utils/weatherUtils';
+import SpotlightCard from './SpotlightCard';
 
 interface WeatherCardProps {
     weather: WeatherData;
@@ -17,8 +18,8 @@ export default function WeatherCard({
     FADE_DURATION,
 }: WeatherCardProps) {
     return (
-        <main
-            className={`bg-gray-100/60 shadow-md rounded-2xl p-6 w-full max-w-md text-center text-black mx-auto mb-4 transition-opacity duration-[${FADE_DURATION}ms] ${pageVisible ? (fade ? 'opacity-0' : 'opacity-100') : 'opacity-0'
+        <SpotlightCard
+            className={`glass-panel rounded-2xl p-6 w-full max-w-md text-center text-black mx-auto mb-4 transition-opacity duration-[${FADE_DURATION}ms] ${pageVisible ? (fade ? 'opacity-0' : 'opacity-100') : 'opacity-0'
                 }`}
         >
             <p>
@@ -33,6 +34,6 @@ export default function WeatherCard({
             <p className="text-xl font-semibold">
                 {weather.coatAdvice} {displayDay}
             </p>
-        </main>
+        </SpotlightCard>
     );
 }

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Location } from '../hooks/useLocation';
 import LocationSearch from './LocationSearch';
+import SpotlightText from './SpotlightText';
 
 interface HeaderProps {
     displayDay: 'today' | 'tomorrow';
@@ -26,11 +27,12 @@ export default function Header({
             className={`mb-2 text-center transition-opacity duration-[${FADE_DURATION}ms] ${pageVisible ? (fade ? 'opacity-0' : 'opacity-100') : 'opacity-0'
                 }`}
         >
+
             <h1 className="text-3xl font-bold text-black">
                 Do I Need a Coat{' '}
-                <span className="underline cursor-pointer" onClick={handleDayToggle}>
+                <SpotlightText className="underline" onClick={handleDayToggle}>
                     {displayDay === 'today' ? 'Today' : 'Tomorrow'}
-                </span>
+                </SpotlightText>
                 ? 🧥
             </h1>
 

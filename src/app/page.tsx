@@ -7,6 +7,7 @@ import Header from './components/Header';
 import WeatherCard from './components/WeatherCard';
 import CurrentWeatherCard from './components/CurrentWeatherCard';
 import LoadingScreen from './components/LoadingScreen';
+import SpotlightCard from './components/SpotlightCard';
 
 export default function Home() {
   // 🌍 Location state
@@ -117,23 +118,27 @@ export default function Home() {
             />
           )}
 
+
           {/* Manual Refresh + Countdown */}
           <div
-            className={`fixed bottom-4 right-4 flex flex-col items-center space-y-1 transition-opacity duration-500 z-50 ${pageVisible ? 'opacity-100' : 'opacity-0'
+            className={`fixed bottom-4 right-4 flex flex-col items-center space-y-2 transition-opacity duration-500 z-50 ${pageVisible ? 'opacity-100' : 'opacity-0'
               }`}
           >
-            <p className="text-xs text-black bg-white/60 px-2 py-1 rounded-md shadow-sm">
-              {minutesLeft !== null
-                ? `Auto Refresh in: 0:${minutesLeft.toString().padStart(2, '0')}`
-                : ''}
-            </p>
-            <button
+            <SpotlightCard className="glass-panel px-3 py-1 rounded-md shadow-sm">
+              <p className="text-xs text-black">
+                {minutesLeft !== null
+                  ? `Auto Refresh in: 0:${minutesLeft.toString().padStart(2, '0')}`
+                  : ''}
+              </p>
+            </SpotlightCard>
+
+            <SpotlightCard
               onClick={() => window.location.reload()}
-              className="bg-white/60 hover:bg-blue-100/60 text-black font-bold py-2 px-4 rounded-full shadow-lg"
+              className="glass-panel cursor-pointer hover:bg-blue-100/20 text-black font-bold py-2 px-4 rounded-full shadow-lg flex items-center justify-center"
               title="Refresh weather and map"
             >
               🔄 Refresh
-            </button>
+            </SpotlightCard>
           </div>
         </>
       )}
