@@ -1,22 +1,24 @@
 'use client';
 import { useEffect, useState } from 'react';
 import RainViewerBackground from './components/RainViewerBackground';
-import { useLocation } from './hooks/useLocation';
+import { useLocation, Location as AppLocation } from './hooks/useLocation';
 import { useWeather } from './hooks/useWeather';
 import Header from './components/Header';
 import WeatherCard from './components/WeatherCard';
 import CurrentWeatherCard from './components/CurrentWeatherCard';
 import LoadingScreen from './components/LoadingScreen';
 import SpotlightCard from './components/SpotlightCard';
+import ZoomControl from './components/ZoomControl';
 
 export default function Home() {
   // 🌍 Location state
   const { location, updateLocation } = useLocation();
 
   // Weather states
-  const { todayWeather, tomorrowWeather, currentHourWeather } = useWeather(location);
+  const { todayWeather, tomorrowWeather, currentHourWeather, refresh: refreshWeather } = useWeather(location);
   const [displayDay, setDisplayDay] = useState<'today' | 'tomorrow'>('today');
   const [fade, setFade] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Auto refresh countdown timer (in minutes)
   const [minutesLeft, setMinutesLeft] = useState<number | null>(null);
@@ -28,8 +30,23 @@ export default function Home() {
   const [mapLoaded, setMapLoaded] = useState(false);
 
   // Durations and delays (adjust to tweak pacing)
-  const FADE_DURATION = 600; // ms
+  const FADE_DURATION = 1000; // ms
   const STEP_DELAY = 200; // ms between stages
+
+  const handleRefresh = () => {
+    setFade(true);
+    setTimeout(() => {
+      // Trigger data refresh
+      refreshWeather();
+      // Trigger map rain layer refresh (bust cache)
+      setRefreshKey(prev => prev + 1);
+
+      // Wait for "back in after 1 second" (same as fade duration)
+      setTimeout(() => {
+        setFade(false);
+      }, FADE_DURATION);
+    }, FADE_DURATION);
+  };
 
   // Countdown + full refresh at X:01 every hour
   useEffect(() => {
@@ -44,7 +61,7 @@ export default function Home() {
       setMinutesLeft(diffMinutes);
 
       if (now.getMinutes() === 1 && now.getSeconds() === 0) {
-        window.location.reload();
+        handleRefresh();
       }
     };
     updateTimer();
@@ -62,6 +79,20 @@ export default function Home() {
       setFade(false);
     }, 200);
   };
+
+  const handleLocationUpdate = (newLoc: AppLocation) => {
+    setFade(true);
+    // Wait for fade out to complete
+    setTimeout(() => {
+      updateLocation(newLoc);
+      // Wait for flyover (2000ms) + buffer (250ms)
+      setTimeout(() => {
+        setFade(false);
+      }, 2250);
+    }, FADE_DURATION);
+  };
+
+  const [zoomLevel, setZoomLevel] = useState(8);
 
   // 🌟 Staged fade sequence
   useEffect(() => {
@@ -81,7 +112,12 @@ export default function Home() {
         className={`transition-opacity duration-[${FADE_DURATION}ms] ${backgroundVisible ? 'opacity-100' : 'opacity-0'
           }`}
       >
-        <RainViewerBackground location={location} onLoaded={() => setMapLoaded(true)} />
+        <RainViewerBackground
+          location={location}
+          onLoaded={() => setMapLoaded(true)}
+          zoom={zoomLevel}
+          refreshKey={refreshKey}
+        />
       </div>
 
       {/* Loading Screen */}
@@ -94,7 +130,7 @@ export default function Home() {
             displayDay={displayDay}
             handleDayToggle={handleDayToggle}
             location={location}
-            setLocation={updateLocation}
+            setLocation={handleLocationUpdate}
             fade={fade}
             pageVisible={pageVisible}
             FADE_DURATION={FADE_DURATION}
@@ -119,11 +155,13 @@ export default function Home() {
           )}
 
 
-          {/* Manual Refresh + Countdown */}
+          {/* Manual Refresh + Countdown + Zoom Control */}
           <div
             className={`fixed bottom-4 right-4 flex flex-col items-center space-y-2 transition-opacity duration-500 z-50 ${pageVisible ? 'opacity-100' : 'opacity-0'
               }`}
           >
+            <ZoomControl currentZoom={zoomLevel} onZoomChange={setZoomLevel} />
+
             <SpotlightCard className="glass-panel px-3 py-1 rounded-md shadow-sm">
               <p className="text-xs text-black">
                 {minutesLeft !== null
@@ -133,7 +171,7 @@ export default function Home() {
             </SpotlightCard>
 
             <SpotlightCard
-              onClick={() => window.location.reload()}
+              onClick={handleRefresh}
               className="glass-panel cursor-pointer hover:bg-blue-100/20 text-black font-bold py-2 px-4 rounded-full shadow-lg flex items-center justify-center"
               title="Refresh weather and map"
             >

@@ -37,7 +37,6 @@ export function useLocation() {
         if (typeof window !== 'undefined') {
             localStorage.setItem('location', JSON.stringify(newLoc));
         }
-        window.location.reload();
     };
 
     return { location, updateLocation };

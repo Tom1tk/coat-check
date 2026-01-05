@@ -64,16 +64,9 @@ export default function LocationSearch({ location, setLocation }: LocationSearch
                                     key={i}
                                     className="p-2 cursor-pointer hover:bg-blue-100"
                                     onClick={() => {
-                                        const newLoc = {
-                                            name: s.name,
-                                            latitude: s.latitude,
-                                            longitude: s.longitude,
-                                        };
-                                        setLocation(newLoc);
-                                        if (typeof window !== 'undefined') {
-                                            localStorage.setItem('location', JSON.stringify(newLoc));
-                                        }
-                                        window.location.reload();
+                                        // Just update the search box, don't submit yet
+                                        setSearchQuery(`${s.name}, ${s.country}`);
+                                        setSuggestions([]);
                                     }}
                                 >
                                     {s.name}, {s.country}
@@ -82,7 +75,7 @@ export default function LocationSearch({ location, setLocation }: LocationSearch
                         </ul>
                     )}
 
-                    {/* Manual search button & error message */}
+                    {/* Manual submit button & error message */}
                     <button
                         onClick={async () => {
                             if (!searchQuery) return;
@@ -102,10 +95,8 @@ export default function LocationSearch({ location, setLocation }: LocationSearch
                                         longitude: loc.longitude,
                                     };
                                     setLocation(newLoc);
-                                    if (typeof window !== 'undefined') {
-                                        localStorage.setItem('location', JSON.stringify(newLoc));
-                                    }
-                                    window.location.reload();
+                                    // Close the search UI
+                                    setSearchVisible(false);
                                 } else {
                                     setErrorMessage('Location not found. Try another search.');
                                 }
@@ -118,7 +109,7 @@ export default function LocationSearch({ location, setLocation }: LocationSearch
                         }}
                         className="bg-blue-500 hover:bg-blue-600 text-black font-semibold py-1 px-3 rounded-md mt-2"
                     >
-                        {loadingLocation ? 'Searching...' : 'Search'}
+                        {loadingLocation ? 'Submitting...' : 'Submit'}
                     </button>
                     {errorMessage && <p className="text-red-600 mt-1 text-sm">{errorMessage}</p>}
                 </SpotlightCard>

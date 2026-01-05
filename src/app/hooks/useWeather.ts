@@ -87,17 +87,18 @@ export function useWeather(location: Location) {
         };
     }, [location]);
 
-    useEffect(() => {
-        const fetchAllWeather = async () => {
-            const current = await fetchCurrentHourWeather();
-            const today = await fetchWeatherForDay(0);
-            const tomorrow = await fetchWeatherForDay(1);
-            setCurrentHourWeather(current);
-            setTodayWeather(today);
-            setTomorrowWeather(tomorrow);
-        };
-        fetchAllWeather();
+    const refresh = useCallback(async () => {
+        const current = await fetchCurrentHourWeather();
+        const today = await fetchWeatherForDay(0);
+        const tomorrow = await fetchWeatherForDay(1);
+        setCurrentHourWeather(current);
+        setTodayWeather(today);
+        setTomorrowWeather(tomorrow);
     }, [fetchCurrentHourWeather, fetchWeatherForDay]);
 
-    return { todayWeather, tomorrowWeather, currentHourWeather };
+    useEffect(() => {
+        refresh();
+    }, [refresh]);
+
+    return { todayWeather, tomorrowWeather, currentHourWeather, refresh };
 }

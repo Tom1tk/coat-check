@@ -1,69 +1,148 @@
 // app/components/RainViewerBackground.tsx
 "use client";
-import React, { JSX, useEffect, useState } from "react";
-import { CachedTileImage } from "./CachedTileImage";
-import { latLonToTile, TILE_SIZE } from "../utils/mapUtils";
-
-const ZOOM = 8;
-const GRID_W = 17;
-const GRID_H = 9;
-const WEST_OFFSET = -1;
+import React, { JSX, useEffect } from "react";
+import { Map, MapMarker, MarkerContent, useMap } from "@/components/ui/map";
 
 interface RainViewerBackgroundProps {
   onLoaded?: () => void;
-  location?: { latitude: number; longitude: number }; // allow dynamic location
+  location?: { latitude: number; longitude: number };
+  zoom?: number;
+  refreshKey?: number;
+}
+
+// Component to add rain overlay layer and trigger onLoaded callback
+function RainOverlayLayer({
+  location,
+  onLoaded,
+  zoom = 8,
+  refreshKey = 0
+}: {
+  location: { latitude: number; longitude: number };
+  onLoaded?: () => void;
+  zoom?: number;
+  refreshKey?: number;
+}) {
+  const { map, isLoaded } = useMap();
+
+  useEffect(() => {
+    if (!map || !isLoaded) return;
+
+    const apiKey = process.env.NEXT_PUBLIC_OWM_API_KEY;
+
+    const addRainLayer = () => {
+      // Remove existing layers/sources first to avoid duplicates
+      if (map.getLayer('rain-layer')) {
+        map.removeLayer('rain-layer');
+      }
+      if (map.getSource('rain-tiles')) {
+        map.removeSource('rain-tiles');
+      }
+
+      // Add OpenWeatherMap precipitation raster source
+      map.addSource('rain-tiles', {
+        type: 'raster',
+        tiles: [
+          `https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${apiKey}&t=${refreshKey}`
+        ],
+        tileSize: 256,
+        attribution: '© OpenWeatherMap'
+      });
+
+      // Add rain layer on top of base map
+      map.addLayer({
+        id: 'rain-layer',
+        type: 'raster',
+        source: 'rain-tiles',
+        paint: {
+          'raster-opacity': 0.8,
+          'raster-brightness-max': 1,
+          'raster-contrast': 0.3
+        }
+      });
+    };
+
+    // Add layer immediately if style is already loaded
+    if (map.isStyleLoaded()) {
+      addRainLayer();
+    }
+
+    // Re-add layer whenever style changes (MAPCN theme switching)
+    const handleStyleData = () => {
+      // Use timeout to ensure style is fully applied
+      setTimeout(() => {
+        if (map.isStyleLoaded() && !map.getSource('rain-tiles')) {
+          addRainLayer();
+        }
+      }, 100);
+    };
+
+    map.on('styledata', handleStyleData);
+
+    // Trigger onLoaded callback
+    onLoaded?.();
+
+    return () => {
+      map.off('styledata', handleStyleData);
+      // Cleanup on unmount
+      if (map.getLayer('rain-layer')) {
+        map.removeLayer('rain-layer');
+      }
+      if (map.getSource('rain-tiles')) {
+        map.removeSource('rain-tiles');
+      }
+    };
+  }, [map, isLoaded, onLoaded, refreshKey]);
+
+  // Fly to new location when it changes
+  useEffect(() => {
+    if (!map || !location) return;
+
+    map.flyTo({
+      center: [location.longitude, location.latitude],
+      zoom: zoom,
+      duration: 2000,
+      essential: true
+    });
+  }, [map, location, zoom]);
+
+  // Watch for zoom changes separately to update just the zoom if location doesn't change
+  useEffect(() => {
+    if (!map) return;
+    map.flyTo({
+      zoom: zoom,
+      duration: 1000, // Faster duration for just zoom changes
+      essential: true
+    });
+  }, [map, zoom]);
+
+  return null;
+}
+
+// Custom location marker - a pulsing dot
+function LocationMarker({ location }: { location: { latitude: number; longitude: number } }) {
+  return (
+    <MapMarker
+      longitude={location.longitude}
+      latitude={location.latitude}
+    >
+      <MarkerContent>
+        <div className="relative">
+          {/* Outer pulsing ring */}
+          <div className="absolute -inset-2 rounded-full bg-blue-500/30 animate-ping" />
+          {/* Inner dot */}
+          <div className="relative h-4 w-4 rounded-full border-2 border-white bg-blue-500 shadow-lg" />
+        </div>
+      </MarkerContent>
+    </MapMarker>
+  );
 }
 
 function RainViewerBackground({
   onLoaded,
   location = { latitude: 52.2053, longitude: 0.1218 }, // default Cambridge
+  zoom = 8,
+  refreshKey = 0
 }: RainViewerBackgroundProps): JSX.Element {
-  const [tiles, setTiles] = useState<{ x: number; y: number; left: number; top: number }[]>([]);
-  const [loadedCount, setLoadedCount] = useState(0);
-
-  const totalTiles = GRID_W * GRID_H * 2; // base + rain layer per tile
-
-  useEffect(() => {
-    const { x, y } = latLonToTile(location.latitude, location.longitude, ZOOM);
-    const xi = Math.floor(x);
-    const yi = Math.floor(y);
-    const offsetX = (x - xi) * TILE_SIZE;
-    const offsetY = (y - yi) * TILE_SIZE;
-
-    const containerWidth = GRID_W * TILE_SIZE;
-    const containerHeight = GRID_H * TILE_SIZE;
-    const centerPixelX = containerWidth / 2 - TILE_SIZE / 2;
-    const centerPixelY = containerHeight / 2 - TILE_SIZE / 2;
-    const halfW = Math.floor(GRID_W / 2);
-    const halfH = Math.floor(GRID_H / 2);
-
-    const t: { x: number; y: number; left: number; top: number }[] = [];
-    for (let dx = -halfW; dx <= halfW; dx++) {
-      for (let dy = -halfH; dy <= halfH; dy++) {
-        const tileX = xi + dx + WEST_OFFSET;
-        const tileY = yi + dy;
-        const left = centerPixelX + dx * TILE_SIZE - offsetX;
-        const top = centerPixelY + dy * TILE_SIZE - offsetY;
-        t.push({ x: tileX, y: tileY, left, top });
-      }
-    }
-    setTiles(t);
-  }, [location]); // recalc tiles whenever location changes
-
-  useEffect(() => {
-    if (loadedCount >= totalTiles && onLoaded) {
-      onLoaded();
-    }
-  }, [loadedCount, totalTiles, onLoaded]);
-
-  if (!tiles.length)
-    return <div style={{ position: "absolute", inset: 0, zIndex: -10, pointerEvents: "none" }} />;
-
-  const containerWidth = GRID_W * TILE_SIZE;
-  const containerHeight = GRID_H * TILE_SIZE;
-
-  const handleImgLoad = () => setLoadedCount((c) => c + 1);
-
   return (
     <div
       aria-hidden
@@ -73,57 +152,26 @@ function RainViewerBackground({
         zIndex: -10,
         overflow: "hidden",
         pointerEvents: "none",
-        backgroundColor: "#d0d8e0",
       }}
     >
-      <div
-        style={{
-          position: "absolute",
-          left: "50%",
-          top: "50%",
-          width: containerWidth,
-          height: containerHeight,
-          transform: "translate(-50%, -50%)",
-          opacity: 0.9,
+      <Map
+        center={[location.longitude, location.latitude]}
+        zoom={zoom}
+        interactive={false}
+        dragPan={false}
+        scrollZoom={false}
+        doubleClickZoom={false}
+        touchZoomRotate={false}
+        keyboard={false}
+        trackResize={true}
+        styles={{
+          light: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+          dark: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
         }}
       >
-        {tiles.map((tile, i) => (
-          <CachedTileImage
-            key={`base-${i}`}
-            src={`https://tile.openstreetmap.org/${ZOOM}/${tile.x}/${tile.y}.png`}
-            alt=""
-            onLoad={handleImgLoad}
-            style={{
-              position: "absolute",
-              left: tile.left,
-              top: tile.top,
-              width: TILE_SIZE,
-              height: TILE_SIZE,
-              filter: "grayscale(100%) brightness(1) contrast(1.2)",
-              opacity: 0.6,
-            }}
-          />
-        ))}
-
-        {tiles.map((tile, i) => (
-          <img
-            key={`rain-${i}`}
-            src={`https://tile.openweathermap.org/map/precipitation_new/${ZOOM}/${tile.x}/${tile.y}.png?appid=${process.env.NEXT_PUBLIC_OWM_API_KEY}`}
-            alt=""
-            onLoad={handleImgLoad}
-            style={{
-              position: "absolute",
-              left: tile.left,
-              top: tile.top,
-              width: TILE_SIZE,
-              height: TILE_SIZE,
-              mixBlendMode: "multiply",
-              opacity: 1,
-              filter: "brightness(1.2) contrast(1.2)",
-            }}
-          />
-        ))}
-      </div>
+        <RainOverlayLayer location={location} onLoaded={onLoaded} zoom={zoom} refreshKey={refreshKey} />
+        <LocationMarker location={location} />
+      </Map>
     </div>
   );
 }
