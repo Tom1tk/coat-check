@@ -28,7 +28,7 @@ export default function Header({
                 }`}
         >
 
-            <h1 className="text-3xl font-bold text-black">
+            <h1 className="text-3xl font-bold text-black dark:text-white">
                 Do I Need a Coat{' '}
                 <SpotlightText className="underline" onClick={handleDayToggle}>
                     {displayDay === 'today' ? 'Today' : 'Tomorrow'}

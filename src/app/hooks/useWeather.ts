@@ -9,17 +9,50 @@ export function useWeather(location: Location) {
 
     const fetchCurrentHourWeather = useCallback(async (): Promise<CurrentHourWeather> => {
         const { latitude, longitude } = location;
+        // Use timezone=auto to get correct local time data, but we also need to know the offset to calculate "now"
+        // Actually, open-meteo returns 'utc_offset_seconds'
         const res = await fetch(
-            `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,precipitation,weathercode&timezone=Europe/London`
+            `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,precipitation,weathercode&timezone=auto`
         );
         const data = await res.json();
+        const utcOffsetSeconds = data.utc_offset_seconds;
 
-        const now = new Date();
-        const currentHour = now.getHours();
-        const currentTimeStr = now.toISOString().split('T')[0] + `T${currentHour.toString().padStart(2, '0')}:00`;
+        // Calculate location's local time "now"
+        const nowUTC = new Date().getTime() + (new Date().getTimezoneOffset() * 60000);
+        const locationNow = new Date(nowUTC + (utcOffsetSeconds * 1000));
+
+        const currentHour = locationNow.getHours();
+        // Construct ISO string for matching: YYYY-MM-DDThh:00
+        const currentHourStr = locationNow.toISOString().split('T')[0] + `T${currentHour.toString().padStart(2, '0')}:00`;
+        // Note: locationNow.toISOString() might still display in UTC or system zone if we are not careful? 
+        // Wait, toISOString() is always UTC. 
+        // We constructed 'locationNow' such that its 'UTC' getters return the shifted time? No, 'new Date(timestamp)' creates a date object.
+        // If we want the ISO string representation of the *local* time, we should format manually or trick it.
+        // Trick: 
+        // The `locationNow` object holds the timestamp that *equals* the local time if interpreted as UTC.
+        // No, `new Date(utc + offset)`: if offset is +1h, timestamp is +1h. 
+        // If I print this Date object, it prints in System Time (e.g. London).
+        // Let's rely on matching by index if possible, OR:
+        // Open-Meteo `hourly.time` is ISO8601 strings in the requested timezone (e.g. "2023-10-27T14:00").
+        // We need to construct this string "YYYY-MM-DDTHH:00" using the components of `locationNow`.
+        // BUT `locationNow` components (getHours()) are based on SYSTEM timeZone if we just used `new Date(...)`.
+
+        // Correct approach:
+        // 1. Get current UTC time.
+        // 2. Add offset to get "Target Time as UTC".
+        // 3. Use getUTCHours(), getUTCDate(), etc. to extract the components.
+        const targetTimeAsUTC = new Date(nowUTC + (utcOffsetSeconds * 1000));
+
+        const year = targetTimeAsUTC.getUTCFullYear();
+        const month = String(targetTimeAsUTC.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(targetTimeAsUTC.getUTCDate()).padStart(2, '0');
+        const hour = String(targetTimeAsUTC.getUTCHours()).padStart(2, '0');
+
+        const currentTimeStr = `${year}-${month}-${day}T${hour}:00`;
 
         const times = data.hourly.time;
         const currentIndex = times.indexOf(currentTimeStr);
+        // Fallback to middle if not found (shouldn't happen usually)
         const actualIndex = currentIndex !== -1 ? currentIndex : Math.floor(times.length / 2);
 
         const { temperature_2m, precipitation, weathercode } = data.hourly;
@@ -38,7 +71,7 @@ export function useWeather(location: Location) {
             currentTemp,
             currentRain,
             currentCondition,
-            currentHour: `${currentHour}:00`,
+            currentHour: `${hour}:00`,
             coatAdvice,
         };
     }, [location]);

@@ -1,18 +1,25 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { useTheme } from 'next-themes';
 import RainViewerBackground from './components/RainViewerBackground';
 import { useLocation, Location as AppLocation } from './hooks/useLocation';
 import { useWeather } from './hooks/useWeather';
+import { useSunCalc } from './hooks/useSunCalc';
 import Header from './components/Header';
 import WeatherCard from './components/WeatherCard';
 import CurrentWeatherCard from './components/CurrentWeatherCard';
 import LoadingScreen from './components/LoadingScreen';
 import SpotlightCard from './components/SpotlightCard';
 import ZoomControl from './components/ZoomControl';
+import ThemeToggle from './components/ThemeToggle';
 
 export default function Home() {
   // 🌍 Location state
   const { location, updateLocation } = useLocation();
+
+  // ☀️ Sun/Moon Calc
+  const { isDay } = useSunCalc(location.latitude, location.longitude);
+  const { setTheme, resolvedTheme } = useTheme();
 
   // Weather states
   const { todayWeather, tomorrowWeather, currentHourWeather, refresh: refreshWeather } = useWeather(location);
@@ -33,7 +40,27 @@ export default function Home() {
   const FADE_DURATION = 1000; // ms
   const STEP_DELAY = 200; // ms between stages
 
-  const handleRefresh = () => {
+  // Ref to track if initial auto-theme set has happened to avoid double-fades on load
+  const initialThemeSet = useRef(false);
+
+  // Auto-set theme based on location time
+  useEffect(() => {
+    // If this is a location update (implied by this effect running when isDay changes due to location change),
+    // we want to sync the theme. 
+    // However, actual theme switching should be handled during transitions if possible.
+    // This effect ensures if isDay flips *while* staying in the same location (e.g. sunset happens), it updates.
+    // Or if initial load.
+
+    // For location changes, we handle it in handleLocationUpdate to sync with fade.
+    // But we need a fallback here for initial load or time passing.
+
+    if (!initialThemeSet.current) {
+      setTheme(isDay ? 'light' : 'dark');
+      initialThemeSet.current = true;
+    }
+  }, [isDay, setTheme]);
+
+  const handleRefresh = useCallback(() => {
     setFade(true);
     setTimeout(() => {
       // Trigger data refresh
@@ -46,7 +73,7 @@ export default function Home() {
         setFade(false);
       }, FADE_DURATION);
     }, FADE_DURATION);
-  };
+  }, [refreshWeather, FADE_DURATION]);
 
   // Countdown + full refresh at X:01 every hour
   useEffect(() => {
@@ -67,7 +94,7 @@ export default function Home() {
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [handleRefresh]);
 
   const allWeatherLoaded = currentHourWeather !== null && todayWeather !== null && tomorrowWeather !== null;
   const allReady = allWeatherLoaded && mapLoaded;
@@ -85,6 +112,19 @@ export default function Home() {
     // Wait for fade out to complete
     setTimeout(() => {
       updateLocation(newLoc);
+
+      // Calculate isDay for the NEW location immediately to switch theme while hidden
+      // Note: We can't use the hook value 'isDay' here yet because 'location' state hasn't propagated to the hook re-render.
+      // We need to calculate it manually or wait. 
+      // Waiting might be tricky with the timing. Let's rely on the hook update but ensure we re-trigger fade-in mainly after mappedflyover.
+      // Actually, to avoid "flash", we can calculate it here using the same logic.
+      import('suncalc').then((SunCalc) => {
+        const now = new Date();
+        const times = SunCalc.default.getTimes(now, newLoc.latitude, newLoc.longitude);
+        const newIsDay = now >= times.sunrise && now < times.sunset;
+        setTheme(newIsDay ? 'light' : 'dark');
+      });
+
       // Wait for flyover (2000ms) + buffer (250ms)
       setTimeout(() => {
         setFade(false);
@@ -92,7 +132,27 @@ export default function Home() {
     }, FADE_DURATION);
   };
 
-  const [zoomLevel, setZoomLevel] = useState(8);
+  const handleThemeToggle = () => {
+    setFade(true);
+    setTimeout(() => {
+      setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
+      setTimeout(() => {
+        setFade(false);
+      }, FADE_DURATION); // Wait a bit before fading back in to allow map style swap to start
+    }, FADE_DURATION);
+  };
+
+  const [zoomLevel, setZoomLevel] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('zoomLevel');
+      return stored ? parseInt(stored) : 8;
+    }
+    return 8;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('zoomLevel', zoomLevel.toString());
+  }, [zoomLevel]);
 
   // 🌟 Staged fade sequence
   useEffect(() => {
@@ -163,7 +223,7 @@ export default function Home() {
             <ZoomControl currentZoom={zoomLevel} onZoomChange={setZoomLevel} />
 
             <SpotlightCard className="glass-panel px-3 py-1 rounded-md shadow-sm">
-              <p className="text-xs text-black">
+              <p className="text-xs text-black dark:text-white">
                 {minutesLeft !== null
                   ? `Auto Refresh in: 0:${minutesLeft.toString().padStart(2, '0')}`
                   : ''}
@@ -172,11 +232,18 @@ export default function Home() {
 
             <SpotlightCard
               onClick={handleRefresh}
-              className="glass-panel cursor-pointer hover:bg-blue-100/20 text-black font-bold py-2 px-4 rounded-full shadow-lg flex items-center justify-center"
+              className="glass-panel cursor-pointer hover:bg-blue-100/20 text-black dark:text-white font-bold py-2 px-4 rounded-full shadow-lg flex items-center justify-center"
               title="Refresh weather and map"
             >
               🔄 Refresh
             </SpotlightCard>
+          </div>
+
+          {/* Theme Toggle Button (Bottom Left) */}
+          <div
+            className={`fixed bottom-4 left-4 transition-opacity duration-500 z-50 ${pageVisible ? 'opacity-100' : 'opacity-0'}`}
+          >
+            <ThemeToggle onToggle={handleThemeToggle} />
           </div>
         </>
       )}

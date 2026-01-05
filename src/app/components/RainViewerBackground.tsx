@@ -118,6 +118,8 @@ function RainOverlayLayer({
   return null;
 }
 
+
+
 // Custom location marker - a pulsing dot
 function LocationMarker({ location }: { location: { latitude: number; longitude: number } }) {
   return (
@@ -137,11 +139,18 @@ function LocationMarker({ location }: { location: { latitude: number; longitude:
   );
 }
 
+interface RainViewerBackgroundProps {
+  onLoaded?: () => void;
+  location?: { latitude: number; longitude: number };
+  zoom?: number;
+  refreshKey?: number;
+}
+
 function RainViewerBackground({
   onLoaded,
   location = { latitude: 52.2053, longitude: 0.1218 }, // default Cambridge
   zoom = 8,
-  refreshKey = 0
+  refreshKey = 0,
 }: RainViewerBackgroundProps): JSX.Element {
   return (
     <div
@@ -166,7 +175,7 @@ function RainViewerBackground({
         trackResize={true}
         styles={{
           light: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-          dark: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
+          dark: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
         }}
       >
         <RainOverlayLayer location={location} onLoaded={onLoaded} zoom={zoom} refreshKey={refreshKey} />
