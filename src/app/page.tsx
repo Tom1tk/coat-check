@@ -75,25 +75,74 @@ export default function Home() {
     }, FADE_DURATION);
   }, [refreshWeather, FADE_DURATION]);
 
-  // Countdown + full refresh at X:01 every hour
+  // Track the last hour we successfully refreshed the data for.
+  // We initialize based on the current time:
+  // If we are BEFORE minute 1 (e.g. 10:00), we initialize to PREVIOUS hour (9) so that 10:01 triggers a refresh.
+  // If we are AFTER minute 1 (e.g. 10:05), we initialize to CURRENT hour (10) because the initial data load is fresh enough.
+  const lastRefreshedHour = useRef<number>(
+    (() => {
+      const now = new Date();
+      return now.getMinutes() < 1 ? now.getHours() - 1 : now.getHours();
+    })()
+  );
+
+  // Robust timer & visibility check
   useEffect(() => {
+    const checkRefreshNeeded = () => {
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+
+      // We only want to refresh if we are past the top of the hour (minute >= 1)
+      // AND we haven't refreshed for this hour yet.
+      // We also handle the day rollover (currentHour < lastRefreshedHour could happen at midnight).
+      // Logic: If currentHour is different from lastRefreshedHour, and minute >= 1, we need update.
+      if (currentMinute >= 1 && currentHour !== lastRefreshedHour.current) {
+        console.log(`[AutoRefresh] Refreshing! Current: ${currentHour}:${currentMinute}, Last: ${lastRefreshedHour.current}`);
+        handleRefresh();
+        lastRefreshedHour.current = currentHour;
+      }
+    };
+
     const updateTimer = () => {
       const now = new Date();
       const nextHour = new Date(now);
-      nextHour.setHours(now.getMinutes() >= 1 ? now.getHours() + 1 : now.getHours());
+
+      // If we are already past minute 1, the next refresh is the NEXT hour's minute 1.
+      // If we are before minute 1, the next refresh is THIS hour's minute 1.
+      if (now.getMinutes() >= 1) {
+        nextHour.setHours(now.getHours() + 1);
+      }
       nextHour.setMinutes(1, 0, 0);
 
       const diffMs = nextHour.getTime() - now.getTime();
       const diffMinutes = Math.max(0, Math.floor(diffMs / 60000));
       setMinutesLeft(diffMinutes);
 
-      if (now.getMinutes() === 1 && now.getSeconds() === 0) {
-        handleRefresh();
+      checkRefreshNeeded();
+    };
+
+    // Run immediately
+    updateTimer();
+
+    // Interval for timer and checks
+    const interval = setInterval(updateTimer, 1000);
+
+    // Visibility listener to "catch up" if the interval was suspended
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkRefreshNeeded();
+        // Also update the UI timer immediately
+        updateTimer();
       }
     };
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
-    return () => clearInterval(interval);
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [handleRefresh]);
 
   const allWeatherLoaded = currentHourWeather !== null && todayWeather !== null && tomorrowWeather !== null;
