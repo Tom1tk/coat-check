@@ -164,9 +164,7 @@ export default function Home() {
 
       // Calculate isDay for the NEW location immediately to switch theme while hidden
       // Note: We can't use the hook value 'isDay' here yet because 'location' state hasn't propagated to the hook re-render.
-      // We need to calculate it manually or wait. 
-      // Waiting might be tricky with the timing. Let's rely on the hook update but ensure we re-trigger fade-in mainly after mappedflyover.
-      // Actually, to avoid "flash", we can calculate it here using the same logic.
+      // Use suncalc directly (already imported via useSunCalc's underlying usage)
       import('suncalc').then((SunCalc) => {
         const now = new Date();
         const times = SunCalc.default.getTimes(now, newLoc.latitude, newLoc.longitude);

@@ -1,6 +1,6 @@
 // app/components/RainViewerBackground.tsx
 "use client";
-import React, { JSX, useEffect } from "react";
+import React, { JSX, useEffect, useRef } from "react";
 import { Map, MapMarker, MarkerContent, useMap } from "@/components/ui/map";
 
 interface RainViewerBackgroundProps {
@@ -23,55 +23,71 @@ function RainOverlayLayer({
   refreshKey?: number;
 }) {
   const { map, isLoaded } = useMap();
+  const layerAddedRef = useRef(false);
+  const currentRefreshKeyRef = useRef(refreshKey);
 
   useEffect(() => {
     if (!map || !isLoaded) return;
 
     const apiKey = process.env.NEXT_PUBLIC_OWM_API_KEY;
 
-    const addRainLayer = () => {
-      // Remove existing layers/sources first to avoid duplicates
-      if (map.getLayer('rain-layer')) {
-        map.removeLayer('rain-layer');
+    const addRainLayer = (key: number) => {
+      const layerId = 'rain-layer';
+      const sourceId = 'rain-tiles';
+
+      // If layer already exists with same key, skip
+      if (map.getSource(sourceId) && currentRefreshKeyRef.current === key && layerAddedRef.current) {
+        return;
       }
-      if (map.getSource('rain-tiles')) {
-        map.removeSource('rain-tiles');
+
+      // Remove existing layer/source if present
+      if (map.getLayer(layerId)) {
+        map.removeLayer(layerId);
+      }
+      if (map.getSource(sourceId)) {
+        map.removeSource(sourceId);
       }
 
       // Add OpenWeatherMap precipitation raster source
-      map.addSource('rain-tiles', {
+      map.addSource(sourceId, {
         type: 'raster',
         tiles: [
-          `https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${apiKey}&t=${refreshKey}`
+          `https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${apiKey}&t=${key}`
         ],
         tileSize: 256,
         attribution: '© OpenWeatherMap'
       });
 
-      // Add rain layer on top of base map
+      // Add rain layer with transition for smooth opacity changes
       map.addLayer({
-        id: 'rain-layer',
+        id: layerId,
         type: 'raster',
-        source: 'rain-tiles',
+        source: sourceId,
         paint: {
           'raster-opacity': 0.8,
+          'raster-opacity-transition': { duration: 300, delay: 0 },
           'raster-brightness-max': 1,
           'raster-contrast': 0.3
         }
       });
+
+      currentRefreshKeyRef.current = key;
+      layerAddedRef.current = true;
     };
 
     // Add layer immediately if style is already loaded
     if (map.isStyleLoaded()) {
-      addRainLayer();
+      addRainLayer(refreshKey);
     }
 
-    // Re-add layer whenever style changes (MAPCN theme switching)
+    // Re-add layer whenever style changes (theme switching)
     const handleStyleData = () => {
+      // Reset the "added" flag since style changed
+      layerAddedRef.current = false;
       // Use timeout to ensure style is fully applied
       setTimeout(() => {
         if (map.isStyleLoaded() && !map.getSource('rain-tiles')) {
-          addRainLayer();
+          addRainLayer(currentRefreshKeyRef.current);
         }
       }, 100);
     };
@@ -93,27 +109,40 @@ function RainOverlayLayer({
     };
   }, [map, isLoaded, onLoaded, refreshKey]);
 
-  // Fly to new location when it changes
+  // Consolidated fly-to effect for location AND zoom changes
+  // Using a ref to track previous values to avoid redundant animations
+  const prevLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
+  const prevZoomRef = useRef<number | null>(null);
+
   useEffect(() => {
     if (!map || !location) return;
 
-    map.flyTo({
-      center: [location.longitude, location.latitude],
-      zoom: zoom,
-      duration: 2000,
-      essential: true
-    });
-  }, [map, location, zoom]);
+    const locationChanged =
+      !prevLocationRef.current ||
+      prevLocationRef.current.latitude !== location.latitude ||
+      prevLocationRef.current.longitude !== location.longitude;
 
-  // Watch for zoom changes separately to update just the zoom if location doesn't change
-  useEffect(() => {
-    if (!map) return;
-    map.flyTo({
-      zoom: zoom,
-      duration: 1000, // Faster duration for just zoom changes
-      essential: true
-    });
-  }, [map, zoom]);
+    const zoomChanged = prevZoomRef.current !== null && prevZoomRef.current !== zoom;
+
+    // Only animate if something actually changed
+    if (locationChanged) {
+      map.flyTo({
+        center: [location.longitude, location.latitude],
+        zoom: zoom,
+        duration: 2000,
+        essential: true
+      });
+    } else if (zoomChanged) {
+      map.flyTo({
+        zoom: zoom,
+        duration: 1000,
+        essential: true
+      });
+    }
+
+    prevLocationRef.current = location;
+    prevZoomRef.current = zoom;
+  }, [map, location, zoom]);
 
   return null;
 }
@@ -137,13 +166,6 @@ function LocationMarker({ location }: { location: { latitude: number; longitude:
       </MarkerContent>
     </MapMarker>
   );
-}
-
-interface RainViewerBackgroundProps {
-  onLoaded?: () => void;
-  location?: { latitude: number; longitude: number };
-  zoom?: number;
-  refreshKey?: number;
 }
 
 function RainViewerBackground({
@@ -185,4 +207,14 @@ function RainViewerBackground({
   );
 }
 
-export default React.memo(RainViewerBackground);
+export default React.memo(RainViewerBackground, (prevProps, nextProps) => {
+  // Only re-render if these specific props change
+  return (
+    prevProps.location?.latitude === nextProps.location?.latitude &&
+    prevProps.location?.longitude === nextProps.location?.longitude &&
+    prevProps.zoom === nextProps.zoom &&
+    prevProps.refreshKey === nextProps.refreshKey
+    // Intentionally ignoring onLoaded since it doesn't change behavior once called
+  );
+});
+

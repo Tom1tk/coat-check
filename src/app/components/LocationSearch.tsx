@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Location, Suggestion } from '../hooks/useLocation';
 import SpotlightCard from './SpotlightCard';
 import SpotlightText from './SpotlightText';
@@ -14,6 +14,43 @@ export default function LocationSearch({ location, setLocation }: LocationSearch
     const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
     const [loadingLocation, setLoadingLocation] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+
+    // Debounce timer ref
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const fetchSuggestions = useCallback(async (query: string) => {
+        if (query.length < 2) {
+            setSuggestions([]);
+            return;
+        }
+        try {
+            const res = await fetch(
+                `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=5`
+            );
+            const data = await res.json();
+            if (data.results) setSuggestions(data.results);
+            else setSuggestions([]);
+        } catch (err) {
+            console.error(err);
+            setSuggestions([]);
+        }
+    }, []);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setSearchQuery(value);
+        setErrorMessage('');
+
+        // Clear any existing debounce timer
+        if (debounceRef.current) {
+            clearTimeout(debounceRef.current);
+        }
+
+        // Set new debounce timer (300ms)
+        debounceRef.current = setTimeout(() => {
+            fetchSuggestions(value);
+        }, 300);
+    };
 
     return (
         <div className="mt-2 flex flex-col text-black items-center">
@@ -32,27 +69,7 @@ export default function LocationSearch({ location, setLocation }: LocationSearch
                         type="text"
                         placeholder="Enter city name..."
                         value={searchQuery}
-                        onChange={async (e) => {
-                            setSearchQuery(e.target.value);
-                            setErrorMessage('');
-                            if (e.target.value.length < 2) {
-                                setSuggestions([]);
-                                return;
-                            }
-                            try {
-                                const res = await fetch(
-                                    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
-                                        e.target.value
-                                    )}&count=5`
-                                );
-                                const data = await res.json();
-                                if (data.results) setSuggestions(data.results);
-                                else setSuggestions([]);
-                            } catch (err) {
-                                console.error(err);
-                                setSuggestions([]);
-                            }
-                        }}
+                        onChange={handleInputChange}
                         className="border border-gray-300 rounded-md p-2 w-full"
                     />
 
