@@ -7,7 +7,7 @@ export interface SunTime {
     isDay: boolean;
 }
 
-export function useSunCalc(latitude: number, longitude: number): SunTime {
+export function useSunCalc(latitude: number, longitude: number, refreshTrigger?: number): SunTime {
     const sunTime = useMemo(() => {
         const now = new Date();
         const times = SunCalc.getTimes(now, latitude, longitude);
@@ -21,7 +21,8 @@ export function useSunCalc(latitude: number, longitude: number): SunTime {
             sunset: times.sunset,
             isDay
         };
-    }, [latitude, longitude]); // Recalculate if location changes
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [latitude, longitude, refreshTrigger]); // Recalculate if location changes or refresh triggered
 
     return sunTime;
 }

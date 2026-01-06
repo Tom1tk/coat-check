@@ -17,8 +17,9 @@ export default function Home() {
   // 🌍 Location state
   const { location, updateLocation } = useLocation();
 
-  // ☀️ Sun/Moon Calc
-  const { isDay } = useSunCalc(location.latitude, location.longitude);
+  // ☀️ Sun/Moon Calc - with trigger to force recalculation on tab wake
+  const [sunCalcTrigger, setSunCalcTrigger] = useState(0);
+  const { isDay } = useSunCalc(location.latitude, location.longitude, sunCalcTrigger);
   const { setTheme, resolvedTheme } = useTheme();
 
   // Weather states
@@ -29,6 +30,9 @@ export default function Home() {
 
   // Auto refresh countdown timer (in minutes)
   const [minutesLeft, setMinutesLeft] = useState<number | null>(null);
+
+  // Track last refresh time for stale data detection
+  const lastRefreshTime = useRef<number>(Date.now());
 
   // Staged fade controls
   const [loadingTextVisible, setLoadingTextVisible] = useState(true);
@@ -54,9 +58,13 @@ export default function Home() {
     // For location changes, we handle it in handleLocationUpdate to sync with fade.
     // But we need a fallback here for initial load or time passing.
 
+    // Initial theme set OR theme sync when isDay changes (e.g., on tab wake after sunset)
     if (!initialThemeSet.current) {
       setTheme(isDay ? 'light' : 'dark');
       initialThemeSet.current = true;
+    } else {
+      // Sync theme whenever isDay changes (e.g., tab wake after sunset)
+      setTheme(isDay ? 'light' : 'dark');
     }
   }, [isDay, setTheme]);
 
@@ -67,6 +75,8 @@ export default function Home() {
       refreshWeather();
       // Trigger map rain layer refresh (bust cache)
       setRefreshKey(prev => prev + 1);
+      // Track when we last refreshed for stale data detection
+      lastRefreshTime.current = Date.now();
 
       // Wait for "back in after 1 second" (same as fade duration)
       setTimeout(() => {
@@ -128,10 +138,21 @@ export default function Home() {
     // Interval for timer and checks
     const interval = setInterval(updateTimer, 1000);
 
-    // Visibility listener to "catch up" if the interval was suspended
+    // Visibility listener to "catch up" if the tab was suspended
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        checkRefreshNeeded();
+        // Force sun calc to recalculate isDay on wake
+        setSunCalcTrigger(prev => prev + 1);
+
+        // Check if data is stale (>5 minutes old)
+        const now = Date.now();
+        const staleDuration = 5 * 60 * 1000; // 5 minutes
+        if (now - lastRefreshTime.current > staleDuration) {
+          console.log('[Wake] Data stale, forcing refresh');
+          handleRefresh();
+        } else {
+          checkRefreshNeeded();
+        }
         // Also update the UI timer immediately
         updateTimer();
       }
