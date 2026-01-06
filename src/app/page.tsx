@@ -46,25 +46,28 @@ export default function Home() {
 
   // Ref to track if initial auto-theme set has happened to avoid double-fades on load
   const initialThemeSet = useRef(false);
+  // Track previous isDay value to detect sunrise/sunset transitions
+  const prevIsDay = useRef<boolean | null>(null);
 
-  // Auto-set theme based on location time
+  // Auto-set theme based on location time - smart behavior:
+  // - On initial load: set theme to match isDay
+  // - On sunrise/sunset transition (isDay changes): auto-switch theme
+  // - Manual toggle works freely; auto-switch only triggers on actual transitions
   useEffect(() => {
-    // If this is a location update (implied by this effect running when isDay changes due to location change),
-    // we want to sync the theme. 
-    // However, actual theme switching should be handled during transitions if possible.
-    // This effect ensures if isDay flips *while* staying in the same location (e.g. sunset happens), it updates.
-    // Or if initial load.
-
-    // For location changes, we handle it in handleLocationUpdate to sync with fade.
-    // But we need a fallback here for initial load or time passing.
-
-    // Initial theme set OR theme sync when isDay changes (e.g., on tab wake after sunset)
     if (!initialThemeSet.current) {
+      // Initial load: set theme to match current time
       setTheme(isDay ? 'light' : 'dark');
+      prevIsDay.current = isDay;
       initialThemeSet.current = true;
-    } else {
-      // Sync theme whenever isDay changes (e.g., tab wake after sunset)
+    } else if (prevIsDay.current !== null && prevIsDay.current !== isDay) {
+      // Sunrise/sunset transition detected: auto-switch theme
+      // This respects user's manual override until the next transition
+      console.log(`[Theme] Auto-switch: ${prevIsDay.current ? 'sunset' : 'sunrise'} detected`);
       setTheme(isDay ? 'light' : 'dark');
+      prevIsDay.current = isDay;
+    } else {
+      // No transition, just update prevIsDay for tracking (e.g., on wake when time is same)
+      prevIsDay.current = isDay;
     }
   }, [isDay, setTheme]);
 
