@@ -45,11 +45,6 @@ A hybrid approach ensures data is **always fresh** when you need it:
 | **Multiple wake events** | Listens to `visibilitychange`, `focus`, and `pageshow` events |
 | **LocalStorage persistence** | Survives browser restarts; only refreshes if hour changed |
 
-Perfect for:
-- Desktop browser tabs left open for hours
-- Kiosk displays that sleep between uses
-- iOS Safari web apps with aggressive tab suspension
-
 ### Premium UI
 - **Glass-morphism cards** with spotlight hover effects
 - **Smooth fade transitions** on all data updates
@@ -107,18 +102,6 @@ src/
 
 ---
 
-## Use Cases
-
-| Scenario | How Coat Check Handles It |
-|----------|---------------------------|
-| **Desktop tab left open** | Detects `visibilitychange` on tab switch, refreshes if hour changed |
-| **Browser restart** | Reads last refresh hour from localStorage, refreshes if stale |
-| **Kiosk display sleep** | Heartbeat detects suspension, validates freshness on wake |
-| **iOS Safari PWA** | Uses `pageshow` event to catch BFCache restoration |
-| **Quick glance** | Data cached within same hour, no unnecessary API calls |
-
----
-
 ## Tech Stack
 
 - **Framework**: [Next.js 16](https://nextjs.org/) with Turbopack
@@ -133,7 +116,7 @@ src/
 
 ## License
 
-This project is licensed under the GNU General Public License v3.0.
+This project is licensed under the [GNU General Public License v3.0](LICENSE).
 
 ---
 
