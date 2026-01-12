@@ -31,8 +31,6 @@ export default function Home() {
   // Auto refresh countdown timer (in minutes)
   const [minutesLeft, setMinutesLeft] = useState<number | null>(null);
 
-  // Track last refresh time for stale data detection
-  const lastRefreshTime = useRef<number>(Date.now());
 
   // Staged fade controls
   const [loadingTextVisible, setLoadingTextVisible] = useState(true);
@@ -71,17 +69,23 @@ export default function Home() {
     }
   }, [isDay, setTheme]);
 
+  // Manual refresh handler - ALWAYS forces full refresh, bypassing all staleness checks
   const handleRefresh = useCallback(() => {
     setFade(true);
     setTimeout(() => {
-      // Trigger data refresh
+      // Trigger weather data refresh
       refreshWeather();
       // Trigger map rain layer refresh (bust cache)
       setRefreshKey(prev => prev + 1);
-      // Track when we last refreshed for stale data detection
-      lastRefreshTime.current = Date.now();
+      // Trigger sun calc recalculation (updates isDay/theme if needed)
+      setSunCalcTrigger(prev => prev + 1);
+      // Update stored hour state so auto-refresh knows we just refreshed
+      const currentHour = new Date().getHours();
+      lastRefreshedHour.current = currentHour;
+      localStorage.setItem('lastRefreshedHour', currentHour.toString());
+      localStorage.setItem('lastRefreshedDate', new Date().toDateString());
 
-      // Wait for "back in after 1 second" (same as fade duration)
+      // Wait for fade duration before fading back in
       setTimeout(() => {
         setFade(false);
       }, FADE_DURATION);
@@ -99,30 +103,95 @@ export default function Home() {
     })()
   );
 
-  // Robust timer & visibility check
+  // ============================================
+  // ROBUST REFRESH SYSTEM
+  // Hybrid approach: Hour-based staleness + Heartbeat suspension detection
+  // ============================================
+
+  // Heartbeat: Updated every 30 seconds while page is active
+  // If heartbeat is stale (>60s old), the page was suspended
+  const lastHeartbeat = useRef<number>(Date.now());
+  const HEARTBEAT_INTERVAL = 30000; // 30 seconds
+  const HEARTBEAT_TOLERANCE = 60000; // 1 minute - if heartbeat older than this, we were suspended
+
+  // Persist last refreshed hour to localStorage for browser restart detection
   useEffect(() => {
-    const checkRefreshNeeded = () => {
-      const now = new Date();
-      const currentHour = now.getHours();
-      const currentMinute = now.getMinutes();
+    // On mount, restore last refreshed hour from localStorage
+    const storedHour = localStorage.getItem('lastRefreshedHour');
+    const storedDate = localStorage.getItem('lastRefreshedDate');
+    const today = new Date().toDateString();
 
-      // We only want to refresh if we are past the top of the hour (minute >= 1)
-      // AND we haven't refreshed for this hour yet.
-      // We also handle the day rollover (currentHour < lastRefreshedHour could happen at midnight).
-      // Logic: If currentHour is different from lastRefreshedHour, and minute >= 1, we need update.
-      if (currentMinute >= 1 && currentHour !== lastRefreshedHour.current) {
-        console.log(`[AutoRefresh] Refreshing! Current: ${currentHour}:${currentMinute}, Last: ${lastRefreshedHour.current}`);
-        handleRefresh();
-        lastRefreshedHour.current = currentHour;
-      }
-    };
+    if (storedHour && storedDate === today) {
+      lastRefreshedHour.current = parseInt(storedHour, 10);
+    }
+  }, []);
 
+  // Save to localStorage whenever we refresh
+  const saveRefreshState = useCallback((hour: number) => {
+    lastRefreshedHour.current = hour;
+    localStorage.setItem('lastRefreshedHour', hour.toString());
+    localStorage.setItem('lastRefreshedDate', new Date().toDateString());
+  }, []);
+
+  // Check if we need to refresh based on hour crossing
+  const checkHourBasedRefresh = useCallback(() => {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+
+    // Refresh if: we're past minute 0 AND hour has changed since last refresh
+    // This handles: hourly updates, day rollovers, multi-hour gaps
+    if (currentMinute >= 1 && currentHour !== lastRefreshedHour.current) {
+      console.log(`[AutoRefresh] Hour changed! Current: ${currentHour}:${currentMinute}, Last refreshed hour: ${lastRefreshedHour.current}`);
+      handleRefresh();
+      saveRefreshState(currentHour);
+      return true;
+    }
+    return false;
+  }, [handleRefresh, saveRefreshState]);
+
+  // Detect suspension via heartbeat staleness
+  const checkSuspensionAndRefresh = useCallback(() => {
+    const now = Date.now();
+    const heartbeatAge = now - lastHeartbeat.current;
+
+    if (heartbeatAge > HEARTBEAT_TOLERANCE) {
+      console.log(`[Wake] Suspension detected! Heartbeat was ${Math.round(heartbeatAge / 1000)}s old`);
+      // Reset heartbeat
+      lastHeartbeat.current = now;
+      // Check if hour changed while suspended
+      checkHourBasedRefresh();
+      return true;
+    }
+    return false;
+  }, [checkHourBasedRefresh]);
+
+  // Unified wake handler - triggered by multiple events
+  const handleWake = useCallback(() => {
+    console.log('[Wake] Page became active');
+
+    // Force sun calc to recalculate isDay
+    setSunCalcTrigger(prev => prev + 1);
+
+    // First, check if we were suspended (heartbeat stale)
+    const wasSuspended = checkSuspensionAndRefresh();
+
+    // If not suspended, still check if hour has changed
+    if (!wasSuspended) {
+      checkHourBasedRefresh();
+    }
+
+    // Reset heartbeat since we're now active
+    lastHeartbeat.current = Date.now();
+  }, [checkSuspensionAndRefresh, checkHourBasedRefresh]);
+
+  // Main timer effect
+  useEffect(() => {
     const updateTimer = () => {
       const now = new Date();
       const nextHour = new Date(now);
 
-      // If we are already past minute 1, the next refresh is the NEXT hour's minute 1.
-      // If we are before minute 1, the next refresh is THIS hour's minute 1.
+      // Calculate next refresh time (minute 1 of next hour if past minute 1, else minute 1 of this hour)
       if (now.getMinutes() >= 1) {
         nextHour.setHours(now.getHours() + 1);
       }
@@ -131,43 +200,65 @@ export default function Home() {
       const diffMs = nextHour.getTime() - now.getTime();
       const diffMinutes = Math.max(0, Math.floor(diffMs / 60000));
       setMinutesLeft(diffMinutes);
-
-      checkRefreshNeeded();
     };
 
-    // Run immediately
+    // Run timer update immediately
     updateTimer();
 
-    // Interval for timer and checks
-    const interval = setInterval(updateTimer, 1000);
+    // Check for hour-based refresh on mount (handles browser restart with cached page)
+    checkHourBasedRefresh();
 
-    // Visibility listener to "catch up" if the tab was suspended
+    // Timer interval - update countdown every second
+    const timerInterval = setInterval(updateTimer, 1000);
+
+    // Hourly check interval - more reliable than relying on exact timing
+    const hourlyCheckInterval = setInterval(() => {
+      checkHourBasedRefresh();
+    }, 60000); // Check every minute
+
+    // Heartbeat interval - keeps heartbeat fresh while page is active
+    const heartbeatInterval = setInterval(() => {
+      lastHeartbeat.current = Date.now();
+    }, HEARTBEAT_INTERVAL);
+
+    // === Multiple event listeners for maximum wake detection ===
+
+    // 1. visibilitychange - main event for tab switching
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        // Force sun calc to recalculate isDay on wake
-        setSunCalcTrigger(prev => prev + 1);
+        handleWake();
+        updateTimer();
+      }
+    };
 
-        // Check if data is stale (>5 minutes old)
-        const now = Date.now();
-        const staleDuration = 5 * 60 * 1000; // 5 minutes
-        if (now - lastRefreshTime.current > staleDuration) {
-          console.log('[Wake] Data stale, forcing refresh');
-          handleRefresh();
-        } else {
-          checkRefreshNeeded();
-        }
-        // Also update the UI timer immediately
+    // 2. focus - catches window focus without visibility change
+    const handleFocus = () => {
+      handleWake();
+      updateTimer();
+    };
+
+    // 3. pageshow - catches back-forward cache restoration
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        console.log('[Wake] Page restored from BFCache');
+        handleWake();
         updateTimer();
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('pageshow', handlePageShow);
 
     return () => {
-      clearInterval(interval);
+      clearInterval(timerInterval);
+      clearInterval(hourlyCheckInterval);
+      clearInterval(heartbeatInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('pageshow', handlePageShow);
     };
-  }, [handleRefresh]);
+  }, [handleWake, checkHourBasedRefresh]);
 
   const allWeatherLoaded = currentHourWeather !== null && todayWeather !== null && tomorrowWeather !== null;
   const allReady = allWeatherLoaded && mapLoaded;
