@@ -44,7 +44,7 @@ export default function SpotlightCard({
             onMouseMove={handleMouseMove}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
-            className={`relative overflow-hidden ${className}`}
+            className={`relative overflow-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${className}`}
             {...props}
         >
             {/* Spotlight Border */}

@@ -103,7 +103,7 @@ export function useWeather(location: Location) {
         setCurrentHourWeather(current);
         setTodayWeather(today);
         setTomorrowWeather(tomorrow);
-    }, [location]);
+    }, [location.latitude, location.longitude]);
 
     useEffect(() => {
         refresh();

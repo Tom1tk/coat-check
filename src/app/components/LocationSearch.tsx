@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { Location, Suggestion } from '../hooks/useLocation';
 import SpotlightCard from './SpotlightCard';
 import SpotlightText from './SpotlightText';
+import { Loader2 } from 'lucide-react';
 
 interface LocationSearchProps {
     location: Location;
@@ -56,7 +57,7 @@ export default function LocationSearch({ location, setLocation }: LocationSearch
         <div className="mt-2 flex flex-col text-black items-center">
             <button
                 onClick={() => setSearchVisible(!searchVisible)}
-                className="hover:text-grey"
+                className="hover:text-grey focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 rounded"
             >
                 <SpotlightText className="underline">
                     📍 Current Location - {location.name}
@@ -65,25 +66,40 @@ export default function LocationSearch({ location, setLocation }: LocationSearch
 
             {searchVisible && (
                 <SpotlightCard className="mt-2 flex flex-col items-center glass-panel p-3 rounded-xl w-64">
+                    <label htmlFor="location-search" className="sr-only">
+                        Search for a city
+                    </label>
                     <input
+                        id="location-search"
+                        name="location"
                         type="text"
-                        placeholder="Enter city name..."
+                        placeholder="Enter city name…"
                         value={searchQuery}
                         onChange={handleInputChange}
-                        className="border border-gray-300 rounded-md p-2 w-full"
+                        autoComplete="off"
+                        spellCheck={false}
+                        className="border border-gray-300 rounded-md p-2 w-full focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:border-transparent"
                     />
 
                     {/* Suggestions dropdown */}
                     {suggestions.length > 0 && (
-                        <ul className="mt-1 max-h-40 overflow-y-auto w-full border border-gray-300 rounded-md bg-white">
+                        <ul className="mt-1 max-h-40 overflow-y-auto w-full border border-gray-300 rounded-md bg-white" role="listbox">
                             {suggestions.map((s, i) => (
                                 <li
                                     key={i}
-                                    className="p-2 cursor-pointer hover:bg-blue-100"
+                                    role="option"
+                                    className="p-2 cursor-pointer hover:bg-blue-100 focus-visible:bg-blue-100 focus-visible:outline-none"
+                                    tabIndex={0}
                                     onClick={() => {
                                         // Just update the search box, don't submit yet
                                         setSearchQuery(`${s.name}, ${s.country}`);
                                         setSuggestions([]);
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            setSearchQuery(`${s.name}, ${s.country}`);
+                                            setSuggestions([]);
+                                        }
                                     }}
                                 >
                                     {s.name}, {s.country}
@@ -124,13 +140,17 @@ export default function LocationSearch({ location, setLocation }: LocationSearch
                                 setLoadingLocation(false);
                             }
                         }}
-                        className="bg-blue-500 hover:bg-blue-600 text-black font-semibold py-1 px-3 rounded-md mt-2"
+                        className="bg-blue-500 hover:bg-blue-600 text-black font-semibold py-1 px-3 rounded-md mt-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 flex items-center gap-2"
                     >
-                        {loadingLocation ? 'Submitting...' : 'Submit'}
+                        {loadingLocation && (
+                            <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                        )}
+                        {loadingLocation ? 'Submitting…' : 'Submit'}
                     </button>
-                    {errorMessage && <p className="text-red-600 mt-1 text-sm">{errorMessage}</p>}
+                    {errorMessage && <p className="text-red-600 mt-1 text-sm" role="alert">{errorMessage}</p>}
                 </SpotlightCard>
             )}
         </div>
     );
 }
+
