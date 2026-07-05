@@ -259,3 +259,13 @@ Stop and report back (do not improvise) if:
   `radarFrames(json): RadarFrame[]`.
 - Reviewer: check the addRainLayer guard actually re-adds on frame change
   but still skips redundant re-adds (the old bug class this component had).
+
+## Amendments (review)
+
+1. `onLoaded` moved out of the layer effect into its own
+   `[map, isLoaded, onLoaded]` effect — the layer effect now early-returns
+   until the frame index arrives, which would have delayed the page reveal
+   behind the RainViewer fetch (staging fired it on map+style ready).
+2. The frame-index fetch gained an 8s timeout that aborts and falls back to
+   OWM tiles; a `timedOut` flag distinguishes it from the unmount/re-run
+   abort, which must not trigger the fallback.

@@ -4,6 +4,10 @@ import React, { JSX, useEffect, useRef, useState } from "react";
 import { Map, MapMarker, MarkerContent, useMap } from "@/components/ui/map";
 import { RadarFrame, latestRadarFrame, rainViewerTileUrl } from "@/app/utils/radarFrames";
 
+// How long to wait for the RainViewer frame index before giving up and
+// falling back to the OWM proxy tiles.
+const FRAME_INDEX_TIMEOUT_MS = 8000;
+
 interface RainViewerBackgroundProps {
   onLoaded?: () => void;
   location?: { latitude: number; longitude: number };
@@ -35,23 +39,39 @@ function RainOverlayLayer({
   // response, or malformed payload.
   useEffect(() => {
     const controller = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, FRAME_INDEX_TIMEOUT_MS);
     fetch('https://api.rainviewer.com/public/weather-maps.json', { signal: controller.signal })
       .then((res) => {
         if (!res.ok) throw new Error(`RainViewer index HTTP ${res.status}`);
         return res.json();
       })
       .then((json) => {
+        clearTimeout(timer);
         const frame = latestRadarFrame(json);
         if (frame === null) throw new Error('RainViewer index malformed or empty');
         setRadarFrame(frame);
       })
       .catch((err) => {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted && !timedOut) return; // unmount/re-run abort
         console.warn('[RainViewer] frame fetch failed, falling back to OWM tiles:', err);
         setRadarFrame('fallback');
       });
-    return () => controller.abort();
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [refreshKey]);
+
+  // Reveal the page as soon as the map is ready — the radar layer pops in
+  // later when its frame index arrives (matches pre-RainViewer timing).
+  useEffect(() => {
+    if (!map || !isLoaded) return;
+    onLoaded?.();
+  }, [map, isLoaded, onLoaded]);
 
   useEffect(() => {
     if (!map || !isLoaded || radarFrame === null) return;
@@ -139,9 +159,6 @@ function RainOverlayLayer({
 
     map.on('styledata', handleStyleData);
 
-    // Trigger onLoaded callback
-    onLoaded?.();
-
     return () => {
       map.off('styledata', handleStyleData);
       // Cleanup on unmount
@@ -152,7 +169,7 @@ function RainOverlayLayer({
         map.removeSource('rain-tiles');
       }
     };
-  }, [map, isLoaded, onLoaded, refreshKey, radarFrame]);
+  }, [map, isLoaded, refreshKey, radarFrame]);
 
   // Consolidated fly-to effect for location AND zoom changes
   // Using a ref to track previous values to avoid redundant animations
