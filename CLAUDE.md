@@ -14,9 +14,12 @@ Deployed on Vercel at coat-check.vercel.app.
 
 ## Environment
 
-- `OWM_API_KEY` in `.env.local` — OpenWeatherMap key for the rain tile
-  overlay, read server-side in `src/app/api/rain-tiles/[z]/[x]/[y]/route.ts`.
-  Copy `.env.example`. Never commit real keys.
+- `OWM_API_KEY` in `.env.local` — **optional**. The primary rain overlay is
+  RainViewer's keyless radar API (`src/app/utils/radarFrames.ts`,
+  `src/app/components/RainViewerBackground.tsx`); this key only powers the
+  OpenWeatherMap fallback tiles, read server-side in
+  `src/app/api/rain-tiles/[z]/[x]/[y]/route.ts`, used if the RainViewer frame
+  index can't be fetched. Copy `.env.example`. Never commit real keys.
 
 ## Architecture (src/)
 
