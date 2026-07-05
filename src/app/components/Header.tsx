@@ -24,8 +24,9 @@ export default function Header({
 }: HeaderProps) {
     return (
         <header
-            className={`mb-2 text-center transition-opacity duration-[${FADE_DURATION}ms] ${pageVisible ? (fade ? 'opacity-0' : 'opacity-100') : 'opacity-0'
+            className={`mb-2 text-center transition-opacity ${pageVisible ? (fade ? 'opacity-0' : 'opacity-100') : 'opacity-0'
                 }`}
+            style={{ transitionDuration: `${FADE_DURATION}ms` }}
         >
 
             <h1 className="text-3xl font-bold text-black dark:text-white">

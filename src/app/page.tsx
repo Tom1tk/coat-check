@@ -331,8 +331,9 @@ export default function Home() {
     <div className="relative min-h-screen flex flex-col items-center justify-center bg-transparent">
       {/* Map */}
       <div
-        className={`transition-opacity duration-[${FADE_DURATION}ms] ${backgroundVisible ? 'opacity-100' : 'opacity-0'
+        className={`transition-opacity ${backgroundVisible ? 'opacity-100' : 'opacity-0'
           }`}
+        style={{ transitionDuration: `${FADE_DURATION}ms` }}
       >
         <RainViewerBackground
           location={location}

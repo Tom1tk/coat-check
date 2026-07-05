@@ -19,8 +19,9 @@ export default function WeatherCard({
 }: WeatherCardProps) {
     return (
         <SpotlightCard
-            className={`glass-panel rounded-2xl p-6 w-full max-w-md text-center text-black dark:text-white mx-auto mb-4 transition-opacity duration-[${FADE_DURATION}ms] ${pageVisible ? (fade ? 'opacity-0' : 'opacity-100') : 'opacity-0'
+            className={`glass-panel rounded-2xl p-6 w-full max-w-md text-center text-black dark:text-white mx-auto mb-4 transition-opacity ${pageVisible ? (fade ? 'opacity-0' : 'opacity-100') : 'opacity-0'
                 }`}
+            style={{ transitionDuration: `${FADE_DURATION}ms` }}
         >
             <p>
                 <strong>Morning (8:00am):</strong> {weather.morningCondition},{' '}
