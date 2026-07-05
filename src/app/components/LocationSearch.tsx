@@ -13,6 +13,7 @@ export default function LocationSearch({ location, setLocation }: LocationSearch
     const [searchVisible, setSearchVisible] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+    const [activeIndex, setActiveIndex] = useState(-1);
     const [loadingLocation, setLoadingLocation] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
 
@@ -25,6 +26,7 @@ export default function LocationSearch({ location, setLocation }: LocationSearch
         if (query.length < 2) {
             abortRef.current?.abort();
             setSuggestions([]);
+            setActiveIndex(-1);
             return;
         }
         abortRef.current?.abort();
@@ -38,10 +40,12 @@ export default function LocationSearch({ location, setLocation }: LocationSearch
             const data = await res.json();
             if (data.results) setSuggestions(data.results);
             else setSuggestions([]);
+            setActiveIndex(-1);
         } catch (err) {
             if (err instanceof DOMException && err.name === 'AbortError') return;
             console.error(err);
             setSuggestions([]);
+            setActiveIndex(-1);
         }
     }, []);
 
@@ -69,6 +73,32 @@ export default function LocationSearch({ location, setLocation }: LocationSearch
         }, 300);
     };
 
+    const selectSuggestion = (s: Suggestion) => {
+        setSearchQuery(`${s.name}, ${s.country}`);
+        setSuggestions([]);
+        setActiveIndex(-1);
+    };
+
+    const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (suggestions.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setActiveIndex((prev) => (prev + 1) % suggestions.length);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setActiveIndex((prev) => (prev <= 0 ? suggestions.length - 1 : prev - 1));
+        } else if (e.key === 'Enter') {
+            if (activeIndex >= 0) {
+                e.preventDefault();
+                selectSuggestion(suggestions[activeIndex]);
+            }
+        } else if (e.key === 'Escape') {
+            setSuggestions([]);
+            setActiveIndex(-1);
+        }
+    };
+
     return (
         <div className="mt-2 flex flex-col text-black items-center">
             <button
@@ -92,30 +122,30 @@ export default function LocationSearch({ location, setLocation }: LocationSearch
                         placeholder="Enter city name…"
                         value={searchQuery}
                         onChange={handleInputChange}
+                        onKeyDown={handleInputKeyDown}
                         autoComplete="off"
                         spellCheck={false}
+                        role="combobox"
+                        aria-expanded={suggestions.length > 0}
+                        aria-controls="location-suggestions"
+                        aria-autocomplete="list"
+                        aria-activedescendant={activeIndex >= 0 ? `location-option-${activeIndex}` : undefined}
                         className="border border-gray-300 rounded-md p-2 w-full focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:border-transparent"
                     />
 
                     {/* Suggestions dropdown */}
                     {suggestions.length > 0 && (
-                        <ul className="mt-1 max-h-40 overflow-y-auto w-full border border-gray-300 rounded-md bg-white" role="listbox">
+                        <ul id="location-suggestions" className="mt-1 max-h-40 overflow-y-auto w-full border border-gray-300 rounded-md bg-white" role="listbox">
                             {suggestions.map((s, i) => (
                                 <li
                                     key={i}
+                                    id={`location-option-${i}`}
                                     role="option"
-                                    className="p-2 cursor-pointer hover:bg-blue-100 focus-visible:bg-blue-100 focus-visible:outline-none"
-                                    tabIndex={0}
+                                    aria-selected={i === activeIndex}
+                                    className={`p-2 cursor-pointer hover:bg-blue-100 focus-visible:bg-blue-100 focus-visible:outline-none ${i === activeIndex ? 'bg-blue-100' : ''}`}
                                     onClick={() => {
                                         // Just update the search box, don't submit yet
-                                        setSearchQuery(`${s.name}, ${s.country}`);
-                                        setSuggestions([]);
-                                    }}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' || e.key === ' ') {
-                                            setSearchQuery(`${s.name}, ${s.country}`);
-                                            setSuggestions([]);
-                                        }
+                                        selectSuggestion(s);
                                     }}
                                 >
                                     {s.name}, {s.country}
