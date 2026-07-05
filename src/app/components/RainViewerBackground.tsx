@@ -1,7 +1,8 @@
 // app/components/RainViewerBackground.tsx
 "use client";
-import React, { JSX, useEffect, useRef } from "react";
+import React, { JSX, useEffect, useRef, useState } from "react";
 import { Map, MapMarker, MarkerContent, useMap } from "@/components/ui/map";
+import { RadarFrame, latestRadarFrame, rainViewerTileUrl } from "@/app/utils/radarFrames";
 
 interface RainViewerBackgroundProps {
   onLoaded?: () => void;
@@ -24,17 +25,50 @@ function RainOverlayLayer({
 }) {
   const { map, isLoaded } = useMap();
   const layerAddedRef = useRef(false);
-  const currentRefreshKeyRef = useRef(refreshKey);
+  const currentTileUrlRef = useRef<string | null>(null);
+  // null = frame index not yet fetched; 'fallback' = use the OWM proxy
+  // because the RainViewer frame index couldn't be fetched or parsed.
+  const [radarFrame, setRadarFrame] = useState<RadarFrame | null | 'fallback'>(null);
+
+  // Fetch the RainViewer frame index (the latest radar composite frame).
+  // Falls back to the OWM proxy tiles on any network error, non-2xx
+  // response, or malformed payload.
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('https://api.rainviewer.com/public/weather-maps.json', { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error(`RainViewer index HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((json) => {
+        const frame = latestRadarFrame(json);
+        if (frame === null) throw new Error('RainViewer index malformed or empty');
+        setRadarFrame(frame);
+      })
+      .catch((err) => {
+        if (controller.signal.aborted) return;
+        console.warn('[RainViewer] frame fetch failed, falling back to OWM tiles:', err);
+        setRadarFrame('fallback');
+      });
+    return () => controller.abort();
+  }, [refreshKey]);
 
   useEffect(() => {
-    if (!map || !isLoaded) return;
+    if (!map || !isLoaded || radarFrame === null) return;
 
-    const addRainLayer = (key: number) => {
+    const addRainLayer = (frame: RadarFrame | 'fallback', key: number) => {
       const layerId = 'rain-layer';
       const sourceId = 'rain-tiles';
 
-      // If layer already exists with same key, skip
-      if (map.getSource(sourceId) && currentRefreshKeyRef.current === key && layerAddedRef.current) {
+      const tileUrl =
+        frame === 'fallback'
+          ? `${window.location.origin}/api/rain-tiles/{z}/{x}/{y}?t=${key}`
+          : rainViewerTileUrl(frame);
+
+      // If layer already exists with the same resolved tile URL, skip.
+      // Tracking the tile URL (rather than just the refresh key) ensures a
+      // new RainViewer frame (new hash path) still forces a re-add.
+      if (map.getSource(sourceId) && currentTileUrlRef.current === tileUrl && layerAddedRef.current) {
         return;
       }
 
@@ -46,15 +80,28 @@ function RainOverlayLayer({
         map.removeSource(sourceId);
       }
 
-      // Add OpenWeatherMap precipitation raster source
-      map.addSource(sourceId, {
-        type: 'raster',
-        tiles: [
-          `${window.location.origin}/api/rain-tiles/{z}/{x}/{y}?t=${key}`
-        ],
-        tileSize: 256,
-        attribution: '© OpenWeatherMap'
-      });
+      // Add the precipitation raster source: RainViewer's multi-colour radar
+      // composite by default, falling back to the OpenWeatherMap proxy when
+      // the RainViewer frame index couldn't be fetched.
+      if (frame === 'fallback') {
+        map.addSource(sourceId, {
+          type: 'raster',
+          tiles: [tileUrl],
+          tileSize: 256,
+          attribution: '© OpenWeatherMap'
+        });
+      } else {
+        map.addSource(sourceId, {
+          type: 'raster',
+          tiles: [tileUrl],
+          tileSize: 256,
+          // RainViewer's native max zoom is 7; the ZoomControl goes to 8, so
+          // this makes MapLibre overzoom instead of requesting missing tiles.
+          maxzoom: 7,
+          attribution:
+            'Weather data © <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a>'
+        });
+      }
 
       // Add rain layer with transition for smooth opacity changes
       map.addLayer({
@@ -69,13 +116,13 @@ function RainOverlayLayer({
         }
       });
 
-      currentRefreshKeyRef.current = key;
+      currentTileUrlRef.current = tileUrl;
       layerAddedRef.current = true;
     };
 
     // Add layer immediately if style is already loaded
     if (map.isStyleLoaded()) {
-      addRainLayer(refreshKey);
+      addRainLayer(radarFrame, refreshKey);
     }
 
     // Re-add layer whenever style changes (theme switching)
@@ -85,7 +132,7 @@ function RainOverlayLayer({
       // Use timeout to ensure style is fully applied
       setTimeout(() => {
         if (map.isStyleLoaded() && !map.getSource('rain-tiles')) {
-          addRainLayer(currentRefreshKeyRef.current);
+          addRainLayer(radarFrame, refreshKey);
         }
       }, 100);
     };
@@ -105,7 +152,7 @@ function RainOverlayLayer({
         map.removeSource('rain-tiles');
       }
     };
-  }, [map, isLoaded, onLoaded, refreshKey]);
+  }, [map, isLoaded, onLoaded, refreshKey, radarFrame]);
 
   // Consolidated fly-to effect for location AND zoom changes
   // Using a ref to track previous values to avoid redundant animations
