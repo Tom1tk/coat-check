@@ -1,5 +1,17 @@
 # Plan 008: page.tsx delegates auto-refresh and auto-theme to dedicated hooks (414 → ~200 lines), behavior preserved
 
+> **STATUS: DONE (2026-07-05).** Executed and merged to `staging`. Two amendments
+> were made during execution and are reflected below:
+> 1. `useAutoRefresh` takes a second param `onWake?: () => void`, called
+>    unconditionally inside `handleWake` where the original bumped
+>    `sunCalcTrigger` — the original single-param signature could not preserve
+>    that page-state coupling. The page passes a stable `handleSunRecalc`.
+> 2. A ref-bridge (`notifyManualRefreshRef`, written each render) breaks the
+>    `handleRefresh` ↔ `notifyManualRefresh` circular dependency (the hook
+>    returns `notifyManualRefresh` but needs `handleRefresh` as input; a direct
+>    dep-array reference is a real TS TDZ error).
+> Result: page.tsx 414 → 244 lines, 4 new countdown tests, suite 32/32.
+
 > **Executor instructions**: Follow this plan step by step. Run every
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and
