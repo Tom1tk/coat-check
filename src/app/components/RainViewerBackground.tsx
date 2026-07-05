@@ -29,8 +29,6 @@ function RainOverlayLayer({
   useEffect(() => {
     if (!map || !isLoaded) return;
 
-    const apiKey = process.env.NEXT_PUBLIC_OWM_API_KEY;
-
     const addRainLayer = (key: number) => {
       const layerId = 'rain-layer';
       const sourceId = 'rain-tiles';
@@ -52,7 +50,7 @@ function RainOverlayLayer({
       map.addSource(sourceId, {
         type: 'raster',
         tiles: [
-          `https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${apiKey}&t=${key}`
+          `${window.location.origin}/api/rain-tiles/{z}/{x}/{y}?t=${key}`
         ],
         tileSize: 256,
         attribution: '© OpenWeatherMap'
