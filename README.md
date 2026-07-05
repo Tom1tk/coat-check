@@ -20,7 +20,8 @@ Live at: **[coat-check.vercel.app](https://coat-check.vercel.app/)**
 
 ### Live Rain Map
 - Full-screen interactive map background (MapLibre GL)
-- Real-time precipitation overlay from OpenWeatherMap
+- Real-time multi-colour precipitation radar from RainViewer, with an
+  OpenWeatherMap fallback
 - Pulsing location marker showing your selected city
 - Smooth animated transitions between locations
 
@@ -57,7 +58,9 @@ A hybrid approach ensures data is **always fresh** when you need it:
 
 ### Prerequisites
 - Node.js 20+ and npm
-- A free [OpenWeatherMap API key](https://home.openweathermap.org/api_keys) (for the rain overlay)
+- No API key required — the rain overlay uses RainViewer's keyless radar API.
+  A free [OpenWeatherMap API key](https://home.openweathermap.org/api_keys) is
+  optional, used only as a fallback if RainViewer is unreachable.
 
 ### Run locally
 
@@ -65,11 +68,13 @@ A hybrid approach ensures data is **always fresh** when you need it:
 git clone <repo-url>
 cd coat-check
 npm install
-cp .env.example .env.local   # then paste your OpenWeatherMap key
+cp .env.example .env.local   # optional: paste your OpenWeatherMap key
 npm run dev                  # http://localhost:3000
 ```
 
-Without the API key the app still runs, but the precipitation overlay will be missing.
+Without the API key the app still shows the full RainViewer radar overlay;
+the key only matters if RainViewer's frame index can't be fetched, in which
+case the app falls back to OpenWeatherMap tiles (which need the key).
 
 ### Scripts
 
@@ -89,7 +94,8 @@ Without the API key the app still runs, but the precipitation overlay will be mi
 |-----|---------|------------|
 | **[Open-Meteo Weather](https://open-meteo.com/)** | Weather forecasts (temperature, precipitation, conditions) | Free, unlimited |
 | **[Open-Meteo Geocoding](https://open-meteo.com/en/docs/geocoding-api)** | City search and coordinates lookup | Free, unlimited |
-| **[OpenWeatherMap Tiles](https://openweathermap.org/api/weathermaps)** | Precipitation radar overlay | Free tier (1M calls/month) |
+| **[RainViewer](https://www.rainviewer.com/api.html)** | Precipitation radar overlay | Free, no key, attribution required |
+| **[OpenWeatherMap Tiles](https://openweathermap.org/api/weathermaps)** | Precipitation overlay (fallback) | Free tier (1M calls/month) |
 | **[CARTO Basemaps](https://carto.com/basemaps/)** | Light/dark map tiles | Free |
 | **[mapcn](https://mapcn.vercel.app/)** | MapLibre React component wrapper | N/A |
 
@@ -154,5 +160,6 @@ This project is licensed under the [GNU General Public License v3.0](LICENSE).
 - Weather data by [Open-Meteo](https://open-meteo.com/)
 - Map component by [mapcn](https://mapcn.vercel.app/)
 - Map tiles by [CARTO](https://carto.com/)
-- Precipitation overlay by [OpenWeatherMap](https://openweathermap.org/)
+- Radar data by [RainViewer](https://www.rainviewer.com/)
+- Precipitation overlay by [OpenWeatherMap](https://openweathermap.org/) (fallback)
 - Deployed on [Vercel](https://vercel.com/)
