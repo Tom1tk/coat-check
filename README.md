@@ -89,12 +89,11 @@ src/
 │   ├── hooks/
 │   │   ├── useWeather.ts        # Fetches and processes weather data
 │   │   ├── useLocation.ts       # Location state + localStorage
-│   │   ├── useSunCalc.ts        # Sunrise/sunset calculations
-│   │   └── useCoatAdvice.ts     # Coat recommendation logic
+│   │   └── useSunCalc.ts        # Sunrise/sunset calculations
 │   │
 │   └── utils/
 │       ├── weatherUtils.ts      # Weather code → condition mapping
-│       └── mapUtils.ts          # Map tile coordinate helpers
+│       └── coatAdvice.ts        # Coat recommendation rules (pure)
 │
 └── components/ui/
     └── map.tsx                  # MapLibre React wrapper (1200+ lines)
