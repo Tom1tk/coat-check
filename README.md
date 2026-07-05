@@ -53,6 +53,36 @@ A hybrid approach ensures data is **always fresh** when you need it:
 
 ---
 
+## Getting Started
+
+### Prerequisites
+- Node.js 20+ and npm
+- A free [OpenWeatherMap API key](https://home.openweathermap.org/api_keys) (for the rain overlay)
+
+### Run locally
+
+```bash
+git clone <repo-url>
+cd coat-check
+npm install
+cp .env.example .env.local   # then paste your OpenWeatherMap key
+npm run dev                  # http://localhost:3000
+```
+
+Without the API key the app still runs, but the precipitation overlay will be missing.
+
+### Scripts
+
+| Command | What it does |
+|---------|--------------|
+| `npm run dev` | Dev server (Turbopack) |
+| `npm run build` | Production build |
+| `npm start` | Serve the production build |
+| `npm run lint` | ESLint |
+| `npm test` | Run the Vitest suite |
+
+---
+
 ## APIs Used
 
 | API | Purpose | Rate Limit |
