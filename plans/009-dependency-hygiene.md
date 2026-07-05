@@ -1,5 +1,16 @@
 # Plan 009: Dependencies aligned — eslint-config-next matches Next 16, audit vulns cleared, types in devDependencies
 
+> **STATUS: PARTIAL (2026-07-05).** Steps 2–3 DONE and merged to `staging`:
+> `npm audit fix` cleared all 5 HIGH advisories (10 → 2 remaining, both a
+> moderate PostCSS advisory nested inside `next` itself — fixable only by a
+> `--force` downgrade to next@9, accepted as noise); `@types/suncalc` moved to
+> `devDependencies`. **Step 1 (eslint-config-next 16) BLOCKED**: the bump
+> crashes ESLint with `TypeError: Converting circular structure to JSON` in the
+> FlatCompat config validator (plugin-version mismatch). Reverting restored the
+> clean baseline — this is config breakage, not an app-code finding, matching
+> the plan's own STOP condition. Left pinned at 15.5.5. **Follow-up:** migrate
+> `eslint.config.mjs` off FlatCompat to flat config, then retry the major bump.
+
 > **Executor instructions**: Follow this plan step by step. Run every
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and

@@ -8,24 +8,56 @@ honor its STOP conditions, and update your row when done.
 Repo verification gates (all plans use these): `npx tsc --noEmit`,
 `npx eslint src`, `npm run build`, and — after plan 004 — `npm test`.
 
-## Execution order & status
+## Execution status (all executed 2026-07-05 by Sonnet executors on branch `staging`)
+
+Each plan was implemented in an isolated worktree by a separate executor,
+reviewed diff-by-diff by the advisor (done criteria re-run, scope + tests
+audited), and merged into `staging` in dependency order. Browser-only checks
+(fade timing, keyboard nav, offline error panel, tab-wake console logs) were
+NOT verified headlessly and are flagged per-plan below for a human pass.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 001 | Weather fetch error handling + retry UI | P1 | S | — | TODO |
-| 002 | Fix broken Tailwind fade durations (dynamic classes) | P1 | S | — | TODO |
-| 003 | Consolidate coat logic, delete dead code, fix README tree | P1 | S | — (land after 001: same file) | TODO |
-| 004 | Test baseline (Vitest) + GitHub Actions CI | P1 | M | 003 | TODO |
-| 005 | Fix timezone bugs in day/current-hour derivation | P1 | M | 001, 004 | TODO |
-| 006 | Proxy OWM tiles server-side + rotate exposed key | P2 | M | — | TODO |
-| 007 | LocationSearch: abort superseded fetches, timer cleanup | P2 | S | — | TODO |
-| 008 | Extract useAutoRefresh/useAutoTheme from page.tsx | P2 | M | 001, 002, 004 | TODO |
-| 009 | Dependency hygiene (eslint-config-next 16, audit fix, types) | P3 | S | — | TODO |
-| 010 | Onboarding docs (README setup, .env.example, CLAUDE.md) | P3 | S | soft: 006 | TODO |
-| 011 | LocationSearch combobox a11y + keyboard navigation | P3 | S | 007 | TODO |
+| 001 | Weather fetch error handling + retry UI | P1 | S | — | DONE (browser offline-path unverified) |
+| 002 | Fix broken Tailwind fade durations (dynamic classes) | P1 | S | — | DONE (visual ~1s fade unverified) |
+| 003 | Consolidate coat logic, delete dead code, fix README tree | P1 | S | 001 | DONE |
+| 004 | Test baseline (Vitest) + GitHub Actions CI | P1 | M | 003 | DONE (25 tests; CI unrun until pushed) |
+| 005 | Fix timezone bugs in day/current-hour derivation | P1 | M | 001, 004 | DONE (tests flipped; suite 28) |
+| 006 | Proxy OWM tiles server-side + rotate exposed key | P2 | M | — | DONE (code); key rotation = operator action |
+| 007 | LocationSearch: abort superseded fetches, timer cleanup | P2 | S | — | DONE (Network-tab race unverified) |
+| 008 | Extract useAutoRefresh/useAutoTheme from page.tsx | P2 | M | 001, 002, 004 | DONE (amended: onWake seam; page 414→244) |
+| 009 | Dependency hygiene (audit fix, types move; config bump blocked) | P3 | S | — | PARTIAL — see below |
+| 010 | Onboarding docs (README setup, .env.example, CLAUDE.md) | P3 | S | soft: 006 | DONE (fresh-clone dry run passed) |
+| 011 | LocationSearch combobox a11y + keyboard navigation | P3 | S | 007 | DONE (keyboard nav unverified) |
 
-Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
-REJECTED (with one-line rationale).
+Final integrated gate on `staging`: `npx tsc --noEmit` exit 0, `npx eslint src`
+0 warnings, `npm test` 32/32 pass, `npm run build` exit 0.
+
+Status values: TODO | IN PROGRESS | DONE | PARTIAL | BLOCKED (with one-line
+reason) | REJECTED (with one-line rationale).
+
+### Plan 009 — PARTIAL
+
+Steps 2–3 landed: `npm audit fix` cleared all 5 HIGH advisories (10 → 2
+remaining, both a moderate PostCSS advisory nested inside `next` itself,
+fixable only by a nonsensical `--force` downgrade to next@9 — accepted as
+noise); `@types/suncalc` moved to `devDependencies`. **Step 1 BLOCKED**:
+bumping `eslint-config-next` 15.5.5 → 16.x crashes ESLint with
+`TypeError: Converting circular structure to JSON` inside the FlatCompat
+config validator — a plugin-version mismatch that needs `eslint.config.mjs`
+migrated off FlatCompat (out of scope). Left pinned at 15.5.5. Reverting the
+bump restored the clean baseline, confirming the STOP was config breakage, not
+an app-code finding. Follow-up: migrate the flat config, then retry the bump.
+
+### Plan 008 — amended during execution
+
+The original hook signature `useAutoRefresh(onRefresh)` could not preserve
+behavior: `handleWake` also bumps page-local `sunCalcTrigger` on every wake,
+independent of any refresh. Resolved by adding a second param
+`onWake?: () => void` called unconditionally in `handleWake` (the page passes
+a stable `handleSunRecalc`). A ref-bridge (`notifyManualRefreshRef`) breaks the
+`handleRefresh` ↔ `notifyManualRefresh` circular dependency. Both are reflected
+in the plan file's Steps section.
 
 ## Dependency notes
 
