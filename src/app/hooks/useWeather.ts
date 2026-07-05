@@ -6,12 +6,17 @@ import { getCoatAdvice } from '../utils/coatAdvice';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type OpenMeteoResponse = any;
 
+// The API returns hourly.time in the location's local time; represent the
+// location's "now" as a Date whose getUTC* fields read as location-local.
+export function locationNow(utcOffsetSeconds: number): Date {
+    return new Date(Date.now() + utcOffsetSeconds * 1000);
+}
+
 export function deriveCurrentHourWeather(data: OpenMeteoResponse): CurrentHourWeather {
     const utcOffsetSeconds = data.utc_offset_seconds;
 
     // Calculate location's local time "now"
-    const nowUTC = new Date().getTime() + (new Date().getTimezoneOffset() * 60000);
-    const targetTimeAsUTC = new Date(nowUTC + (utcOffsetSeconds * 1000));
+    const targetTimeAsUTC = locationNow(utcOffsetSeconds);
 
     const year = targetTimeAsUTC.getUTCFullYear();
     const month = String(targetTimeAsUTC.getUTCMonth() + 1).padStart(2, '0');
@@ -22,12 +27,14 @@ export function deriveCurrentHourWeather(data: OpenMeteoResponse): CurrentHourWe
 
     const times = data.hourly.time;
     const currentIndex = times.indexOf(currentTimeStr);
-    const actualIndex = currentIndex !== -1 ? currentIndex : Math.floor(times.length / 2);
+    if (currentIndex === -1) {
+        throw new Error(`Current hour ${currentTimeStr} not found in forecast data`);
+    }
 
     const { temperature_2m, precipitation, weathercode } = data.hourly;
-    const currentTemp = temperature_2m[actualIndex];
-    const currentRain = precipitation[actualIndex];
-    const currentCondition = codeToCondition(weathercode[actualIndex]);
+    const currentTemp = temperature_2m[currentIndex];
+    const currentRain = precipitation[currentIndex];
+    const currentCondition = codeToCondition(weathercode[currentIndex]);
 
     const coatAdvice = getCoatAdvice([
         { temp: currentTemp, rain: currentRain, condition: currentCondition },
@@ -43,13 +50,20 @@ export function deriveCurrentHourWeather(data: OpenMeteoResponse): CurrentHourWe
 }
 
 export function deriveDayWeather(data: OpenMeteoResponse, dayOffset: number): WeatherData {
-    const dateObj = new Date();
-    dateObj.setDate(dateObj.getDate() + dayOffset);
-    const dateStr = dateObj.toISOString().split('T')[0];
+    const dateObj = locationNow(data.utc_offset_seconds);
+    dateObj.setUTCDate(dateObj.getUTCDate() + dayOffset);
+
+    const year = dateObj.getUTCFullYear();
+    const month = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getUTCDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
 
     const times = data.hourly.time;
     const morningIndex = times.indexOf(`${dateStr}T08:00`);
     const afternoonIndex = times.indexOf(`${dateStr}T17:00`);
+    if (morningIndex === -1 || afternoonIndex === -1) {
+        throw new Error(`Forecast data missing for ${dateStr}`);
+    }
 
     const { temperature_2m, precipitation, weathercode } = data.hourly;
     const morningTemp = temperature_2m[morningIndex];
