@@ -23,7 +23,7 @@ export default function Home() {
   const { setTheme, resolvedTheme } = useTheme();
 
   // Weather states
-  const { todayWeather, tomorrowWeather, currentHourWeather, refresh: refreshWeather } = useWeather(location);
+  const { todayWeather, tomorrowWeather, currentHourWeather, refresh: refreshWeather, error } = useWeather(location);
   const [displayDay, setDisplayDay] = useState<'today' | 'tomorrow'>('today');
   const [fade, setFade] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -344,6 +344,21 @@ export default function Home() {
 
       {/* Loading Screen */}
       {!pageVisible && <LoadingScreen visible={loadingTextVisible} FADE_DURATION={FADE_DURATION} />}
+
+      {/* Weather fetch error */}
+      {error && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <SpotlightCard className="glass-panel rounded-2xl p-6 max-w-md text-center text-black dark:text-white">
+            <p className="font-semibold">{error}</p>
+            <button
+              onClick={() => refreshWeather()}
+              className="mt-4 bg-blue-500 hover:bg-blue-600 text-black font-semibold py-1 px-3 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+            >
+              Retry
+            </button>
+          </SpotlightCard>
+        </div>
+      )}
 
       {/* Main Content */}
       {allReady && currentWeather && (
