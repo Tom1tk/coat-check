@@ -29,9 +29,21 @@ NOT verified headlessly and are flagged per-plan below for a human pass.
 | 009 | Dependency hygiene (audit fix, types move; config bump blocked) | P3 | S | — | PARTIAL — see below |
 | 010 | Onboarding docs (README setup, .env.example, CLAUDE.md) | P3 | S | soft: 006 | DONE (fresh-clone dry run passed) |
 | 011 | LocationSearch combobox a11y + keyboard navigation | P3 | S | 007 | DONE (keyboard nav unverified) |
+| 012 | RainViewer multi-colour radar overlay, OWM fallback | P2 | M | 004, 006 | DONE (amended: onLoaded decoupled + 8s index timeout; browser-only checks unverified) |
 
 Final integrated gate on `staging`: `npx tsc --noEmit` exit 0, `npx eslint src`
-0 warnings, `npm test` 32/32 pass, `npm run build` exit 0.
+0 warnings, `npm test` 38/38 pass, `npm run build` exit 0.
+
+### Plan 012 — amended during review (2026-07-06)
+
+Executed by a Sonnet executor on branch `advisor/012-rainviewer-radar`; live
+RainViewer API smoke passed headlessly (index shape + real tile URL → HTTP
+200 image/png). Two review amendments: (1) `onLoaded` moved to its own
+map-ready effect so the page loading screen is not gated on the RainViewer
+index fetch; (2) the index fetch gets an 8s timeout that triggers the OWM
+fallback (unmount aborts excluded). Browser-only checks still needing a human
+pass: visual palette rendering, theme-toggle overlay survival, and the
+DevTools request-blocking fallback drill.
 
 Status values: TODO | IN PROGRESS | DONE | PARTIAL | BLOCKED (with one-line
 reason) | REJECTED (with one-line rationale).
