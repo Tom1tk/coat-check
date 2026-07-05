@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Location, Suggestion } from '../hooks/useLocation';
 import SpotlightCard from './SpotlightCard';
 import SpotlightText from './SpotlightText';
@@ -18,23 +18,39 @@ export default function LocationSearch({ location, setLocation }: LocationSearch
 
     // Debounce timer ref
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Tracks the in-flight suggestion fetch so a superseded request can be cancelled
+    const abortRef = useRef<AbortController | null>(null);
 
     const fetchSuggestions = useCallback(async (query: string) => {
         if (query.length < 2) {
+            abortRef.current?.abort();
             setSuggestions([]);
             return;
         }
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
         try {
             const res = await fetch(
-                `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=5`
+                `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=5`,
+                { signal: controller.signal }
             );
             const data = await res.json();
             if (data.results) setSuggestions(data.results);
             else setSuggestions([]);
         } catch (err) {
+            if (err instanceof DOMException && err.name === 'AbortError') return;
             console.error(err);
             setSuggestions([]);
         }
+    }, []);
+
+    // Clear the debounce timer and abort any in-flight request on unmount
+    useEffect(() => {
+        return () => {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+            abortRef.current?.abort();
+        };
     }, []);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
