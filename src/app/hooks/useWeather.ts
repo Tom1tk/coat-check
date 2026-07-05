@@ -6,7 +6,7 @@ import { getCoatAdvice } from '../utils/coatAdvice';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type OpenMeteoResponse = any;
 
-function deriveCurrentHourWeather(data: OpenMeteoResponse): CurrentHourWeather {
+export function deriveCurrentHourWeather(data: OpenMeteoResponse): CurrentHourWeather {
     const utcOffsetSeconds = data.utc_offset_seconds;
 
     // Calculate location's local time "now"
@@ -42,7 +42,7 @@ function deriveCurrentHourWeather(data: OpenMeteoResponse): CurrentHourWeather {
     };
 }
 
-function deriveDayWeather(data: OpenMeteoResponse, dayOffset: number): WeatherData {
+export function deriveDayWeather(data: OpenMeteoResponse, dayOffset: number): WeatherData {
     const dateObj = new Date();
     dateObj.setDate(dateObj.getDate() + dayOffset);
     const dateStr = dateObj.toISOString().split('T')[0];
