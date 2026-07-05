@@ -86,28 +86,38 @@ export function useWeather(location: Location) {
     const [todayWeather, setTodayWeather] = useState<WeatherData | null>(null);
     const [tomorrowWeather, setTomorrowWeather] = useState<WeatherData | null>(null);
     const [currentHourWeather, setCurrentHourWeather] = useState<CurrentHourWeather | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     const refresh = useCallback(async () => {
-        const { latitude, longitude } = location;
-        // Single API call with timezone=auto for accurate local time calculation
-        const res = await fetch(
-            `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,precipitation,weathercode&timezone=auto`
-        );
-        const data = await res.json();
+        try {
+            const { latitude, longitude } = location;
+            // Single API call with timezone=auto for accurate local time calculation
+            const res = await fetch(
+                `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,precipitation,weathercode&timezone=auto`
+            );
+            if (!res.ok) {
+                throw new Error(`Weather API returned ${res.status}`);
+            }
+            const data = await res.json();
 
-        // Derive all weather states from the single response
-        const current = deriveCurrentHourWeather(data);
-        const today = deriveDayWeather(data, 0);
-        const tomorrow = deriveDayWeather(data, 1);
+            // Derive all weather states from the single response
+            const current = deriveCurrentHourWeather(data);
+            const today = deriveDayWeather(data, 0);
+            const tomorrow = deriveDayWeather(data, 1);
 
-        setCurrentHourWeather(current);
-        setTodayWeather(today);
-        setTomorrowWeather(tomorrow);
-    }, [location.latitude, location.longitude]);
+            setCurrentHourWeather(current);
+            setTodayWeather(today);
+            setTomorrowWeather(tomorrow);
+            setError(null);
+        } catch (err) {
+            console.error('[Weather] fetch failed:', err);
+            setError('Could not load weather data. Check your connection and try again.');
+        }
+    }, [location]);
 
     useEffect(() => {
         refresh();
     }, [refresh]);
 
-    return { todayWeather, tomorrowWeather, currentHourWeather, refresh };
+    return { todayWeather, tomorrowWeather, currentHourWeather, refresh, error };
 }
