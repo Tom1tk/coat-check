@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { WeatherData, CurrentHourWeather, codeToCondition } from '../utils/weatherUtils';
 import { Location } from './useLocation';
+import { getCoatAdvice } from '../utils/coatAdvice';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type OpenMeteoResponse = any;
@@ -28,12 +29,9 @@ function deriveCurrentHourWeather(data: OpenMeteoResponse): CurrentHourWeather {
     const currentRain = precipitation[actualIndex];
     const currentCondition = codeToCondition(weathercode[actualIndex]);
 
-    let coatAdvice = 'No need to bring a coat';
-    if (currentRain > 0 || currentTemp < 10) {
-        coatAdvice = 'Bring a coat';
-    } else if (currentTemp >= 10 && currentTemp <= 15 && currentCondition === 'Cloudy') {
-        coatAdvice = 'Coat recommended but not necessary';
-    }
+    const coatAdvice = getCoatAdvice([
+        { temp: currentTemp, rain: currentRain, condition: currentCondition },
+    ]);
 
     return {
         currentTemp,
@@ -61,15 +59,10 @@ function deriveDayWeather(data: OpenMeteoResponse, dayOffset: number): WeatherDa
     const morningCondition = codeToCondition(weathercode[morningIndex]);
     const afternoonCondition = codeToCondition(weathercode[afternoonIndex]);
 
-    let coatAdvice = 'No need to bring a coat';
-    if (morningRain > 0 || afternoonRain > 0 || morningTemp < 10 || afternoonTemp < 10) {
-        coatAdvice = 'Bring a coat';
-    } else if (
-        (morningTemp >= 10 && morningTemp <= 15 && morningCondition === 'Cloudy') ||
-        (afternoonTemp >= 10 && afternoonTemp <= 15 && afternoonCondition === 'Cloudy')
-    ) {
-        coatAdvice = 'Coat recommended but not necessary';
-    }
+    const coatAdvice = getCoatAdvice([
+        { temp: morningTemp, rain: morningRain, condition: morningCondition },
+        { temp: afternoonTemp, rain: afternoonRain, condition: afternoonCondition },
+    ]);
 
     return {
         morningTemp,
