@@ -17,7 +17,7 @@ export default function CurrentWeatherCard({
 }: CurrentWeatherCardProps) {
     return (
         <SpotlightCard
-            className={`glass-panel rounded-2xl p-6 w-full max-w-md text-center text-black dark:text-white mx-auto transition-opacity ${pageVisible ? (fade ? 'opacity-0' : 'opacity-100') : 'opacity-0'
+            className={`glass-panel rounded-2xl p-6 w-full max-w-md text-center text-black dark:text-white text-legible mx-auto transition-opacity ${pageVisible ? (fade ? 'opacity-0' : 'opacity-100') : 'opacity-0'
                 }`}
             style={{ transitionDuration: `${FADE_DURATION}ms` }}
         >
