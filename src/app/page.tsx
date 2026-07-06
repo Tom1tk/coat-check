@@ -163,7 +163,7 @@ export default function Home() {
       {/* Weather fetch error */}
       {error && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center">
-          <SpotlightCard className="glass-panel rounded-2xl p-6 max-w-md text-center text-black dark:text-white">
+          <SpotlightCard className="glass-panel rounded-2xl p-6 max-w-md text-center text-black dark:text-white text-legible">
             <p className="font-semibold">{error}</p>
             <button
               onClick={() => refreshWeather()}
@@ -215,7 +215,7 @@ export default function Home() {
             <ZoomControl currentZoom={zoomLevel} onZoomChange={setZoomLevel} />
 
             <SpotlightCard className="glass-panel px-3 py-1 rounded-md shadow-sm">
-              <p className="text-xs text-black dark:text-white">
+              <p className="text-xs text-black dark:text-white text-legible">
                 {minutesLeft !== null
                   ? `Auto Refresh in: 0:${minutesLeft.toString().padStart(2, '0')}`
                   : ''}
@@ -224,7 +224,7 @@ export default function Home() {
 
             <SpotlightCard
               onClick={handleRefresh}
-              className="glass-panel cursor-pointer hover:bg-blue-100/20 text-black dark:text-white font-bold py-2 px-4 rounded-full shadow-lg flex items-center justify-center"
+              className="glass-panel cursor-pointer hover:bg-blue-100/20 text-black dark:text-white text-legible font-bold py-2 px-4 rounded-full shadow-lg flex items-center justify-center"
               title="Refresh weather and map"
             >
               🔄 Refresh

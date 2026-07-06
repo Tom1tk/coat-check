@@ -29,7 +29,7 @@ export default function Header({
             style={{ transitionDuration: `${FADE_DURATION}ms` }}
         >
 
-            <h1 className="text-3xl font-bold text-black dark:text-white">
+            <h1 className="text-3xl font-bold text-black dark:text-white text-legible">
                 Do I Need a Coat{' '}
                 <SpotlightText className="underline" onClick={handleDayToggle}>
                     {displayDay === 'today' ? 'Today' : 'Tomorrow'}
