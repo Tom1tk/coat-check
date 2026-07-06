@@ -28,8 +28,6 @@ function RainOverlayLayer({
   refreshKey?: number;
 }) {
   const { map, isLoaded } = useMap();
-  const layerAddedRef = useRef(false);
-  const currentTileUrlRef = useRef<string | null>(null);
   // null = frame index not yet fetched; 'fallback' = use the OWM proxy
   // because the RainViewer frame index couldn't be fetched or parsed.
   const [radarFrame, setRadarFrame] = useState<RadarFrame | null | 'fallback'>(null);
@@ -85,13 +83,6 @@ function RainOverlayLayer({
           ? `${window.location.origin}/api/rain-tiles/{z}/{x}/{y}?t=${key}`
           : rainViewerTileUrl(frame);
 
-      // If layer already exists with the same resolved tile URL, skip.
-      // Tracking the tile URL (rather than just the refresh key) ensures a
-      // new RainViewer frame (new hash path) still forces a re-add.
-      if (map.getSource(sourceId) && currentTileUrlRef.current === tileUrl && layerAddedRef.current) {
-        return;
-      }
-
       // Remove existing layer/source if present
       if (map.getLayer(layerId)) {
         map.removeLayer(layerId);
@@ -135,33 +126,19 @@ function RainOverlayLayer({
           'raster-contrast': 0.3
         }
       });
-
-      currentTileUrlRef.current = tileUrl;
-      layerAddedRef.current = true;
     };
 
-    // Add layer immediately if style is already loaded
-    if (map.isStyleLoaded()) {
-      addRainLayer(radarFrame, refreshKey);
-    }
-
-    // Re-add layer whenever style changes (theme switching)
-    const handleStyleData = () => {
-      // Reset the "added" flag since style changed
-      layerAddedRef.current = false;
-      // Use timeout to ensure style is fully applied
-      setTimeout(() => {
-        if (map.isStyleLoaded() && !map.getSource('rain-tiles')) {
-          addRainLayer(radarFrame, refreshKey);
-        }
-      }, 100);
-    };
-
-    map.on('styledata', handleStyleData);
+    // `isLoaded` (from useMap) already tracks the map's own style-loaded
+    // state and flips false→true on every theme swap (see components/ui/map.tsx),
+    // so this effect re-running IS the "style changed" signal — no need for
+    // a second, independently-timed 'styledata' listener here. (A previous
+    // version raced its own listener registration against MapLibre's
+    // 'styledata' events during setStyle and could permanently lose the
+    // rain layer on a theme toggle.)
+    addRainLayer(radarFrame, refreshKey);
 
     return () => {
-      map.off('styledata', handleStyleData);
-      // Cleanup on unmount
+      // Cleanup on unmount or before re-adding for a style/frame change
       if (map.getLayer('rain-layer')) {
         map.removeLayer('rain-layer');
       }
