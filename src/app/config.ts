@@ -25,3 +25,9 @@ export const NOWCAST_HEAVY_MM = 2;
 // Map zoom levels the kiosk offers (settings sheet, `?zoom=`).
 export const ZOOM_LEVELS = [8, 7, 6, 5] as const;
 export const DEFAULT_ZOOM = 8;
+
+// Weather moods (plan 017): how far ahead the palette looks, and the storm
+// and frost thresholds.
+export const MOOD_LOOKAHEAD_HOURS = 3;
+export const STORM_GUST_MPH = 40;
+export const FROST_FEELS_LIKE_C = 2;
