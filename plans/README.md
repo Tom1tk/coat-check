@@ -71,6 +71,29 @@ a stable `handleSunRecalc`). A ref-bridge (`notifyManualRefreshRef`) breaks the
 `handleRefresh` ↔ `notifyManualRefresh` circular dependency. Both are reflected
 in the plan file's Steps section.
 
+## 2026-10 series — kiosk redesign (planned 2026-10-17 at `d7af640`)
+
+From `plans/2026-10-audit.md` and the approved hybrid mockup (boards G1/G2:
+A's side panel + B's week ribbon, with weather moods). Reliability first.
+
+| Plan | Title | Priority | Effort | Depends on | Status |
+|------|-------|----------|--------|------------|--------|
+| 013 | Kiosk data scheduler (data-age refresh, cache, map self-recovery) | P1 | M | — | TODO |
+| 014 | Typed forecast, commute windows, graded coat verdicts | P1 | M | soft: 013 | TODO |
+| 015 | Radar: 512 px tiles + animated 2-hour loop | P2 | M | 013 | TODO |
+| 016 | Hybrid kiosk layout (panel + ribbon + nowcast) | P2 | L | 013, 014; soft: 015 | TODO |
+| 017 | Weather moods (palette follows the next 3 hours) | P2 | S–M | 014, 016 | TODO |
+
+- **013 → 015**: 015 hangs the frame refresh on 013's `radarTick`.
+- **013 ↔ 014**: both edit `useWeather.ts`. Run them in sequence (013 first),
+  or merge 013 first and rebase 014.
+- **014 → 016 → 017**: 016 renders 014's windows/verdicts/nowcast and
+  introduces the colour tokens; 017 only adds mood palettes to those tokens.
+- 015 can run in parallel with 014 and 016 (disjoint files except
+  `RainViewerBackground.tsx`, where 016 adds only `setPadding`).
+- Not planned (audit §6, later): Met Office warnings, pollen/AQI, R5 forecast
+  rain grid spike, `/api/version` nightly reload, MapLibre 6 / lucide 1.x bumps.
+
 ## Dependency notes
 
 - **003 → 004**: the test plan targets `getCoatAdvice` in
