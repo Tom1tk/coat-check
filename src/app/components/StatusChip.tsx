@@ -1,41 +1,50 @@
 import React from 'react';
 import { ChipStatus, ChipTone } from '../utils/statusChip';
+import { u } from './kiosk/units';
 
-// Dot colours per tone — inline styles, since Tailwind can't see class names
-// assembled at runtime.
-const TONE_COLOURS: Record<ChipTone, string> = {
-    fresh: '#22c55e',
-    stale: '#f59e0b',
-    offline: '#ef4444',
-    starting: '#94a3b8',
+// Pill background and dot per tone — inline styles, since Tailwind can't see
+// class names assembled at runtime.
+const TONES: Readonly<Record<ChipTone, { bg: string; dot: string }>> = {
+    fresh: { bg: 'var(--ok-bg)', dot: 'var(--ok-fg)' },
+    stale: { bg: 'var(--card)', dot: '#f59e0b' },
+    offline: { bg: 'var(--card)', dot: '#ef4444' },
+    starting: { bg: 'var(--card)', dot: 'var(--ink-muted)' },
 };
 
-const RADAR_DOWN_COLOUR = '#94a3b8';
-
-export default function StatusChip({ status }: { status: ChipStatus }) {
+function Pill({ bg, dot, children }: { bg: string; dot: string; children: React.ReactNode }) {
     return (
-        <div
-            role="status"
-            aria-live="polite"
-            className="glass-panel px-3 py-1 rounded-md shadow-sm flex flex-col items-end gap-0.5 text-xs text-black dark:text-white text-legible"
+        <span
+            className="tn"
+            style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: u(8),
+                fontSize: u(14),
+                color: 'var(--ink-sub)',
+                padding: `${u(6)} ${u(12)}`,
+                borderRadius: 999,
+                background: bg,
+                whiteSpace: 'nowrap',
+            }}
         >
-            <span className="flex items-center gap-1.5 tabular-nums">
-                <span
-                    aria-hidden
-                    className="inline-block h-2 w-2 rounded-full"
-                    style={{ backgroundColor: TONE_COLOURS[status.tone] }}
-                />
-                {status.text}
-            </span>
+            <span aria-hidden style={{ width: u(8), height: u(8), borderRadius: 999, background: dot }} />
+            {children}
+        </span>
+    );
+}
+
+// "Updated 07:40 · Overcast" — data freshness, plus the current condition.
+export default function StatusChip({ status, mood }: { status: ChipStatus; mood?: string }) {
+    const tone = TONES[status.tone];
+    return (
+        <div role="status" aria-live="polite" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: u(6) }}>
+            <Pill bg={tone.bg} dot={tone.dot}>
+                {mood ? `${status.text} · ${mood}` : status.text}
+            </Pill>
             {status.radarDown && (
-                <span className="flex items-center gap-1.5">
-                    <span
-                        aria-hidden
-                        className="inline-block h-2 w-2 rounded-full"
-                        style={{ backgroundColor: RADAR_DOWN_COLOUR }}
-                    />
+                <Pill bg="var(--card)" dot="var(--ink-muted)">
                     Radar unavailable
-                </span>
+                </Pill>
             )}
         </div>
     );

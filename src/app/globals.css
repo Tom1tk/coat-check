@@ -134,6 +134,7 @@
 /* Kiosk tokens (plan 016). Every kiosk colour reads one of these; plan 017's
    weather moods override the same names. Light = board G1, dark = board G2. */
 :root {
+  --u: 1px; /* reference pixel; .kiosk-root scales it */
   --font-display: var(--font-instrument-serif), Georgia, serif;
   --font-ui: var(--font-geist), system-ui, sans-serif;
   --map-tint: rgba(100, 116, 139, 0.10);
@@ -191,6 +192,18 @@
   --sun-icon: #fcd34d;
   --out-win: rgba(94, 234, 212, 0.12);
   --back-win: rgba(253, 186, 116, 0.14);
+}
+
+/* The kiosk is drawn at a 1920×1080 reference; --u is one reference pixel,
+   so every size scales with the screen (see components/kiosk/units.ts). */
+.kiosk-root {
+  --u: min(calc(100vw / 1920), calc(100vh / 1080));
+  font-family: var(--font-ui);
+  color: var(--ink);
+}
+
+.kiosk-root .tn {
+  font-variant-numeric: tabular-nums;
 }
 
 /* A kiosk surface: the glass panels of boards G1/G2. */
