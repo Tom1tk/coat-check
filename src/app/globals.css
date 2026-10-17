@@ -236,3 +236,9 @@
 .kiosk-layer > * {
   pointer-events: auto;
 }
+
+@keyframes kiosk-reveal {
+  from {
+    opacity: 0;
+  }
+}
