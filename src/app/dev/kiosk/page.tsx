@@ -5,6 +5,7 @@ import fixture from '@/app/utils/__fixtures__/forecast-cambridge.json';
 import { parseForecast, parseLocal } from '@/app/utils/forecast';
 import { getMood, isNight, Mood, MOODS } from '@/app/utils/mood';
 import { paletteFor } from '@/app/utils/moodPalettes';
+import { clock12 } from '@/app/utils/twelveHour';
 import { useMoodAttributes } from '@/app/hooks/useMood';
 import { panelModel } from '@/app/utils/panelModel';
 import { nextTwoHours, nowcastSummary } from '@/app/utils/nowcast';
@@ -67,7 +68,7 @@ function DevKiosk() {
                 model={model}
                 place="Cambridge"
                 onPlaceHold={() => setSettings(true)}
-                chip={<StatusChip status={{ tone: 'fresh', text: `Updated ${model.time}`, radarDown: false }} mood={model.mood} />}
+                chip={<StatusChip status={{ tone: 'fresh', text: `Updated ${clock12(model.time)}`, radarDown: false }} mood={model.mood} />}
                 portrait={portrait}
             />
             {portrait ? (

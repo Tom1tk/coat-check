@@ -1,6 +1,7 @@
 'use client';
 import type { ReactNode } from 'react';
 import { useLongPress } from '@/app/hooks/useLongPress';
+import { twelveHour } from '@/app/utils/twelveHour';
 import { u } from './units';
 
 const SETTINGS_HOLD_MS = 3000; // hold the place name this long to open settings
@@ -23,6 +24,10 @@ export default function Clock({
     onPlaceHold?: () => void;
     portrait?: boolean;
 }) {
+    const clock = twelveHour(time);
+    const period = (size: number) => (
+        <span style={{ fontSize: u(size), letterSpacing: 0, marginLeft: u(4), color: 'var(--ink-sub)' }}>{clock.period}</span>
+    );
     const hold = useLongPress(() => onPlaceHold?.(), SETTINGS_HOLD_MS);
     const dateLine = (
         <span style={{ fontSize: u(portrait ? 15 : 17), color: 'var(--ink-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -34,7 +39,8 @@ export default function Clock({
             <header style={{ display: 'flex', flexDirection: 'column', gap: u(4) }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: u(12) }}>
                     <time className="tn" style={{ fontSize: u(46), fontWeight: 300, lineHeight: 1, letterSpacing: u(-1.5) }}>
-                        {time}
+                        {clock.time}
+                        {period(17)}
                     </time>
                     {chip}
                 </div>
@@ -46,7 +52,8 @@ export default function Clock({
         <header style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: u(12) }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: u(2), minWidth: 0 }}>
                 <time className="tn" style={{ fontSize: u(64), fontWeight: 300, lineHeight: 1, letterSpacing: u(-2) }}>
-                    {time}
+                    {clock.time}
+                    {period(22)}
                 </time>
                 {dateLine}
             </div>

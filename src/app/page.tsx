@@ -21,13 +21,13 @@ import { useMapPadding } from './hooks/useMapPadding';
 import { usePortrait } from './hooks/usePortrait';
 import { MAX_AGE_MS } from './utils/freshness';
 import { chipStatus } from './utils/statusChip';
+import { clock12At } from './utils/twelveHour';
 import { panelModel } from './utils/panelModel';
 import { nextTwoHours, nowcastSummary } from './utils/nowcast';
 import { weekRibbon } from './utils/weekRibbon';
 import { burnInOffset } from './utils/burnIn';
 import { paletteFor } from './utils/moodPalettes';
 
-const formatTime = (ms: number) => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
 // The kiosk: map behind, panel left, nowcast top-right, week along the
 // bottom. On a portrait screen (layout B) the panel spans the top and the
@@ -78,7 +78,7 @@ export default function Home() {
         forecastMaxAge: MAX_AGE_MS.forecast,
         fromCache: weather.fromCache,
         radarFailures: scheduler.sources.radar.failures,
-        formatTime,
+        formatTime: clock12At,
       }),
     [now, scheduler, weather.fromCache]
   );

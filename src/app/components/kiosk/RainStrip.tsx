@@ -1,6 +1,7 @@
 'use client';
 import type { RainHour } from '@/app/utils/panelModel';
 import { STRIP_END_HOUR, STRIP_START_HOUR } from '@/app/utils/panelModel';
+import { hour12 } from '@/app/utils/twelveHour';
 import { eyebrow, u } from './units';
 
 const SPAN = STRIP_END_HOUR - STRIP_START_HOUR + 1;
@@ -42,7 +43,7 @@ export default function RainStrip({ hours, shading }: { hours: RainHour[]; shadi
                     {hours.map((h) => (
                         <div
                             key={h.hour}
-                            title={`${h.hour}:00 · ${h.probability}%`}
+                            title={`${hour12(h.hour)} · ${h.probability}%`}
                             style={{ flex: '1 1 0', height: u(Math.round(h.probability * 0.86) + 4), borderRadius: `${u(4)} ${u(4)} ${u(2)} ${u(2)}`, background: barColour(h.probability) }}
                         />
                     ))}
@@ -51,7 +52,7 @@ export default function RainStrip({ hours, shading }: { hours: RainHour[]; shadi
             <div className="tn" style={{ display: 'flex', gap: u(4), padding: `0 ${u(2)}`, fontSize: u(12), color: 'var(--ink-muted)' }}>
                 {hours.map((h, i) => (
                     <span key={h.hour} style={{ flex: '1 1 0', textAlign: 'center' }}>
-                        {i % 2 === 0 ? String(h.hour).padStart(2, '0') : ''}
+                        {i % 2 === 0 ? hour12(h.hour) : ''}
                     </span>
                 ))}
             </div>

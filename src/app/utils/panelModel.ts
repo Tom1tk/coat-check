@@ -1,5 +1,6 @@
 import { COMMUTE, WET } from '../config';
 import { Verdict, WindowSummary, commuteWindows, currentHourSummary, verdictFor } from './coatAdvice';
+import { range12 } from './twelveHour';
 import { Forecast, localDate, localStamp, localTime, locationNow, parseLocal } from './forecast';
 import { describeCode } from './weatherCodes';
 
@@ -10,7 +11,7 @@ export type TagKind = 'coat' | 'ok';
 
 export interface PanelCard {
     label: string; // "Out" | "Back" | "Next 12 h"
-    range: string; // "07:30–09:00"
+    range: string; // "7:30–9:00am"
     code: number;
     temp: number;
     feels: number;
@@ -72,7 +73,7 @@ function card(w: WindowSummary): PanelCard {
     const [tag, kind] = TAG[verdictFor(null, [w]).verdict];
     return {
         label: w.label,
-        range: `${w.start}–${w.end}`,
+        range: range12(w.start, w.end),
         code: w.dominantCode,
         temp: Math.round(w.maxTemp),
         feels: Math.round(w.minFeelsLike),

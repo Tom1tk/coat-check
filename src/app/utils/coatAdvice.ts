@@ -1,3 +1,4 @@
+import { clock12 } from './twelveHour';
 import {
     COLD_FEELS_LIKE_C,
     COMMUTE,
@@ -146,7 +147,7 @@ function wetWord(w: WindowSummary): string {
 
 // One short line, e.g. "Back 17:00 · 70% showers · feels 6°".
 function reasonFor(w: WindowSummary): string {
-    const when = w.label === 'Now' ? 'Now' : `${w.label} ${w.start}`;
+    const when = w.label === 'Now' ? 'Now' : `${w.label} ${clock12(w.start)}`;
     const sky = w.wet ? `${w.maxProbability}% ${wetWord(w)}` : 'dry';
     return `${when} · ${sky} · feels ${Math.round(w.minFeelsLike)}°`;
 }

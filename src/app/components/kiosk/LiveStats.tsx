@@ -1,5 +1,6 @@
 'use client';
 import type { PanelModel } from '@/app/utils/panelModel';
+import { clock12 } from '@/app/utils/twelveHour';
 import { u } from './units';
 
 interface Stat {
@@ -13,7 +14,7 @@ function statsFor({ stats, change }: Pick<PanelModel, 'stats' | 'change'>): Stat
         { value: `${stats.temp}°`, unit: `feels ${stats.feels}°` },
         { value: String(stats.mmNow), unit: 'mm now', rain: stats.mmNow > 0 },
         { value: String(stats.wind), unit: `mph, gusts ${stats.gusts}` },
-        change ? { value: change.time, unit: change.label, rain: true } : { value: '—', unit: 'no change for 12 h' },
+        change ? { value: clock12(change.time), unit: change.label, rain: true } : { value: '—', unit: 'no change for 12 h' },
     ];
 }
 

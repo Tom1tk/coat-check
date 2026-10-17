@@ -24,8 +24,8 @@ describe('panelModel', () => {
         expect(m.heading).toBe('LEAVING NOW');
         expect(m.verdictText).toBe('Coat in bag.');
         expect(m.cards.map((c) => [c.label, c.range, c.tag, c.kind])).toEqual([
-            ['Out', '07:30–09:00', 'No coat needed', 'ok'],
-            ['Back', '17:00–18:30', 'Coat on', 'coat'],
+            ['Out', '7:30–9:00am', 'No coat needed', 'ok'],
+            ['Back', '5:00–6:30pm', 'Coat on', 'coat'],
         ]);
         expect(m.cards[1].line).toBe('80% · 1.2 mm · gusts 28');
         expect(m.rain).toHaveLength(14);

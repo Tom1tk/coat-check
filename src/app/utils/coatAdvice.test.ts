@@ -160,13 +160,13 @@ describe('verdictFor rules', () => {
     it('coat-on when the Out window has started and is cold', () => {
         const r = verdictFor(nowAt('07'), [win({ minFeelsLike: 6 }), back()]);
         expect(r.verdict).toBe('coat-on');
-        expect(r.reason).toBe('Out 07:30 · dry · feels 6°');
+        expect(r.reason).toBe('Out 7:30am · dry · feels 6°');
     });
 
     it('coat-in-bag when dry now but Back is wet', () => {
         const r = verdictFor(nowAt('10'), [win(), back({ maxProbability: 70, dominantCode: 80 })]);
         expect(r.verdict).toBe('coat-in-bag');
-        expect(r.reason).toBe('Back 17:00 · 70% light showers · feels 18°');
+        expect(r.reason).toBe('Back 5:00pm · 70% light showers · feels 18°');
     });
 
     it('ignores a window that has already ended', () => {
@@ -177,7 +177,7 @@ describe('verdictFor rules', () => {
     it('light-layer when dry and cool', () => {
         const r = verdictFor(nowAt('06'), [win({ minFeelsLike: 12 }), back()]);
         expect(r.verdict).toBe('light-layer');
-        expect(r.reason).toBe('Out 07:30 · dry · feels 12°');
+        expect(r.reason).toBe('Out 7:30am · dry · feels 12°');
         expect(r.umbrella).toBe(false);
     });
 

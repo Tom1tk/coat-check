@@ -1,6 +1,7 @@
 'use client';
 import type { ReactNode } from 'react';
 import type { NowcastSlot } from '@/app/utils/nowcast';
+import { clock12, twelveHour } from '@/app/utils/twelveHour';
 import { eyebrow, u } from './units';
 
 const BAR_MAX = 64; // tallest bar; the portrait row draws them at half height
@@ -22,7 +23,7 @@ function Bars({ slots, labels, max }: { slots: NowcastSlot[]; labels: boolean; m
                 {slots.map((s) => (
                     <div
                         key={s.time}
-                        title={`${s.time} · ${s.mm} mm`}
+                        title={`${clock12(s.time)} · ${s.mm} mm`}
                         style={{ flex: '1 1 0', height: u(barHeight(s.mm, max)), borderRadius: `${u(4)} ${u(4)} ${u(2)} ${u(2)}`, background: barColour(s.mm) }}
                     />
                 ))}
@@ -31,7 +32,7 @@ function Bars({ slots, labels, max }: { slots: NowcastSlot[]; labels: boolean; m
                 <div className="tn" style={{ display: 'flex', gap: u(8), fontSize: u(12), color: 'var(--ink-muted)' }}>
                     {slots.map((s) => (
                         <span key={s.time} style={{ flex: '1 1 0', textAlign: 'center' }}>
-                            {s.time}
+                            {twelveHour(s.time).time}
                         </span>
                     ))}
                 </div>
