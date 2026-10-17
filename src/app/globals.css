@@ -131,6 +131,77 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Kiosk tokens (plan 016). Every kiosk colour reads one of these; plan 017's
+   weather moods override the same names. Light = board G1, dark = board G2. */
+:root {
+  --font-display: var(--font-instrument-serif), Georgia, serif;
+  --font-ui: var(--font-geist), system-ui, sans-serif;
+  --map-tint: rgba(100, 116, 139, 0.10);
+  --surface: rgba(255, 255, 255, 0.82);
+  --surface-border: rgba(255, 255, 255, 0.7);
+  --surface-shadow: 0 20px 60px rgba(20, 24, 29, 0.16);
+  --ink: #14181d;
+  --ink-sub: #3c434a;
+  --ink-muted: #5b636c;
+  --accent-coat: #b4400b;
+  --coat-bg: rgba(180, 64, 11, 0.14);
+  --coat-fg: #8a3008;
+  --coat-card: rgba(180, 64, 11, 0.08);
+  --ok-bg: rgba(15, 118, 110, 0.12);
+  --ok-fg: #0d5e58;
+  --card: rgba(20, 24, 29, 0.045);
+  --rain-hi: #2f7fd6;
+  --rain-mid: #8bbbe8;
+  --rain-lo: rgba(20, 24, 29, 0.16);
+  --pct-hi: #1d4ed8;
+  --weekend-tint: rgba(37, 99, 235, 0.08);
+  --today-tint: rgba(20, 24, 29, 0.045);
+  --divider: rgba(20, 24, 29, 0.08);
+  --icon: #3c434a;
+  --rain-icon: #1d4ed8;
+  --sun-icon: #b45309;
+  --out-win: rgba(15, 118, 110, 0.10);
+  --back-win: rgba(180, 64, 11, 0.12);
+}
+
+.dark {
+  --map-tint: rgba(30, 58, 90, 0.14);
+  --surface: rgba(14, 24, 36, 0.82);
+  --surface-border: rgba(125, 211, 252, 0.14);
+  --surface-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  --ink: #e6eef6;
+  --ink-sub: #cfdbe6;
+  --ink-muted: #93a6b8;
+  --accent-coat: #fdba74;
+  --coat-bg: rgba(253, 186, 116, 0.16);
+  --coat-fg: #fdba74;
+  --coat-card: rgba(253, 186, 116, 0.10);
+  --ok-bg: rgba(94, 234, 212, 0.14);
+  --ok-fg: #5eead4;
+  --card: rgba(255, 255, 255, 0.05);
+  --rain-hi: #2fa7e0;
+  --rain-mid: rgba(47, 167, 224, 0.5);
+  --rain-lo: rgba(255, 255, 255, 0.14);
+  --pct-hi: #7dd3fc;
+  --weekend-tint: rgba(125, 211, 252, 0.10);
+  --today-tint: rgba(255, 255, 255, 0.05);
+  --divider: rgba(255, 255, 255, 0.08);
+  --icon: #cfdbe6;
+  --rain-icon: #7dd3fc;
+  --sun-icon: #fcd34d;
+  --out-win: rgba(94, 234, 212, 0.12);
+  --back-win: rgba(253, 186, 116, 0.14);
+}
+
+/* A kiosk surface: the glass panels of boards G1/G2. */
+.kiosk-surface {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  box-shadow: var(--surface-shadow);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
