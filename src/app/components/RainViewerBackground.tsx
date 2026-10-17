@@ -2,9 +2,11 @@
 "use client";
 import React, { JSX, useCallback, useEffect, useRef, useState } from "react";
 import { Map, MapMarker, MarkerContent, useMap } from "@/components/ui/map";
-import { RadarFrame, rainViewerTileUrl } from "@/app/utils/radarFrames";
+import { createPortal } from "react-dom";
+import { RadarFrame, frameDiff, rainViewerTileUrl } from "@/app/utils/radarFrames";
 import { backoffFor } from "@/app/utils/freshness";
 import type { RadarSource } from "@/app/hooks/useRadar";
+import RadarTimestamp from "./RadarTimestamp";
 
 // A map that hasn't finished loading after this long is torn down and
 // rebuilt (e.g. the CARTO style request failed). Later attempts add backoff.
@@ -21,7 +23,211 @@ interface RainViewerBackgroundProps {
   fallbackStamp: number;
 }
 
-// Component to add rain overlay layer and trigger onLoaded callback
+type MapInstance = NonNullable<ReturnType<typeof useMap>["map"]>;
+
+const RADAR_OPACITY = 0.8;
+// Gradual boot: the newest frame at once, then one older frame per step, so
+// 13 frames × ~12 tiles stay well under RainViewer's 100 requests/min.
+const BOOT_STEP_MS = 10_000;
+const FRAME_MS = 600;
+const HOLD_NEWEST_MS = 2000;
+const RAINVIEWER_ATTRIBUTION =
+  'Weather data © <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a>';
+
+const frameSourceId = (f: RadarFrame) => `rain-src-${f.time}`;
+const frameLayerId = (f: RadarFrame) => `rain-lyr-${f.time}`;
+const byTime = (a: RadarFrame, b: RadarFrame) => a.time - b.time;
+
+// One source + layer per frame, hidden until shown. Frames are never
+// re-pointed with setTiles, so tiles already loaded stay cached.
+function ensureFrameLayer(map: MapInstance, frame: RadarFrame) {
+  if (!map.getSource(frameSourceId(frame))) {
+    map.addSource(frameSourceId(frame), {
+      type: "raster",
+      tiles: [rainViewerTileUrl(frame)],
+      tileSize: 512,
+      // RainViewer's native max zoom is 7 (z8 returns an error image); the
+      // ZoomControl goes to 8, so MapLibre overzooms instead.
+      maxzoom: 7,
+      attribution: RAINVIEWER_ATTRIBUTION,
+    });
+  }
+  if (!map.getLayer(frameLayerId(frame))) {
+    map.addLayer({
+      id: frameLayerId(frame),
+      type: "raster",
+      source: frameSourceId(frame),
+      paint: {
+        "raster-opacity": 0,
+        "raster-opacity-transition": { duration: 0, delay: 0 },
+        "raster-fade-duration": 0,
+        "raster-brightness-max": 1,
+        "raster-contrast": 0.3,
+      },
+    });
+  }
+}
+
+function removeFrameLayer(map: MapInstance, frame: RadarFrame) {
+  try {
+    if (map.getLayer(frameLayerId(frame))) map.removeLayer(frameLayerId(frame));
+    if (map.getSource(frameSourceId(frame))) map.removeSource(frameSourceId(frame));
+  } catch {
+    // The map was already removed (watchdog rebuild) — nothing to clean up.
+  }
+}
+
+const isFrameLoaded = (map: MapInstance, f: RadarFrame) =>
+  Boolean(map.getSource(frameSourceId(f))) && map.isSourceLoaded(frameSourceId(f));
+
+// `?radar=still` (kiosk config) or reduced motion → newest frame only, no loop.
+function prefersStillRadar(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    new URLSearchParams(window.location.search).get("radar") === "still" ||
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true
+  );
+}
+
+// Keeps one map layer per radar frame in step with `frames`, boots them in
+// gradually, and loops through the loaded ones. Returns the visible frame.
+function useRadarLoop(map: MapInstance | null, isLoaded: boolean, frames: RadarFrame[] | null) {
+  const [still] = useState(prefersStillRadar);
+  const onMap = useRef<RadarFrame[]>([]); // oldest → newest
+  const pending = useRef<RadarFrame[]>([]); // waiting for gradual boot, newest first
+  const visible = useRef<RadarFrame | null>(null);
+  const [shown, setShown] = useState<RadarFrame | null>(null);
+
+  const show = useCallback((m: MapInstance, frame: RadarFrame | null) => {
+    const prev = visible.current;
+    if (prev && prev.path !== frame?.path && m.getLayer(frameLayerId(prev))) {
+      m.setPaintProperty(frameLayerId(prev), "raster-opacity", 0);
+    }
+    if (frame && m.getLayer(frameLayerId(frame))) {
+      m.setPaintProperty(frameLayerId(frame), "raster-opacity", RADAR_OPACITY);
+    }
+    visible.current = frame;
+    setShown(frame);
+  }, []);
+
+  // A style swap (theme toggle) drops every layer; unmount must too.
+  useEffect(() => {
+    if (!map || !isLoaded) return;
+    return () => {
+      for (const f of onMap.current) removeFrameLayer(map, f);
+      onMap.current = [];
+      pending.current = [];
+      visible.current = null;
+    };
+  }, [map, isLoaded]);
+
+  // Apply the latest frame list: add the newest new frame now, queue older
+  // ones, drop frames that have aged out.
+  useEffect(() => {
+    if (!map || !isLoaded) return;
+    const target = frames ? (still ? frames.slice(-1) : frames) : [];
+    const { add, remove } = frameDiff([...onMap.current, ...pending.current], target);
+    const gone = new Set(remove.map((f) => f.path));
+    for (const f of remove) removeFrameLayer(map, f);
+    onMap.current = onMap.current.filter((f) => !gone.has(f.path));
+    pending.current = [...pending.current.filter((f) => !gone.has(f.path)), ...add.slice(0, -1)]
+      .sort(byTime)
+      .reverse();
+    if (visible.current && gone.has(visible.current.path)) visible.current = null;
+
+    const newest = add.at(-1);
+    if (newest) {
+      ensureFrameLayer(map, newest);
+      onMap.current = [...onMap.current, newest].sort(byTime);
+    }
+    const latest = onMap.current.at(-1) ?? null;
+    if (still || !visible.current || latest === null) show(map, latest);
+  }, [map, isLoaded, frames, still, show]);
+
+  // Gradual boot: one queued frame per step.
+  useEffect(() => {
+    if (!map || !isLoaded) return;
+    const timer = setInterval(() => {
+      const [next, ...rest] = pending.current;
+      if (!next) return;
+      pending.current = rest;
+      ensureFrameLayer(map, next);
+      onMap.current = [...onMap.current, next].sort(byTime);
+    }, BOOT_STEP_MS);
+    return () => clearInterval(timer);
+  }, [map, isLoaded]);
+
+  // The loop: FRAME_MS per loaded frame, a hold on the newest; paused while
+  // the page is hidden.
+  useEffect(() => {
+    if (!map || !isLoaded || still) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const tick = () => {
+      const playable = onMap.current.filter((f) => isFrameLoaded(map, f));
+      let delay = FRAME_MS;
+      if (playable.length > 0) {
+        const i = playable.findIndex((f) => f.path === visible.current?.path);
+        const next = i === -1 ? playable[playable.length - 1] : playable[(i + 1) % playable.length];
+        if (next.path !== visible.current?.path) show(map, next);
+        if (next === playable[playable.length - 1]) delay = HOLD_NEWEST_MS;
+      }
+      timer = setTimeout(tick, delay);
+    };
+    const start = () => {
+      if (timer === null) timer = setTimeout(tick, FRAME_MS);
+    };
+    const stop = () => {
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
+    };
+    const onVisibility = () => (document.hidden ? stop() : start());
+    document.addEventListener("visibilitychange", onVisibility);
+    if (!document.hidden) start();
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [map, isLoaded, still, show]);
+
+  return { shown, newest: frames?.at(-1) ?? null };
+}
+
+// The OpenWeatherMap fallback: one static layer, no loop.
+function useFallbackLayer(map: MapInstance | null, isLoaded: boolean, active: boolean, stamp: number) {
+  useEffect(() => {
+    if (!map || !isLoaded || !active) return;
+    // `isLoaded` flips false→true on every theme swap (see components/ui/map.tsx),
+    // so this effect re-running IS the "style changed" signal.
+    map.addSource("rain-tiles", {
+      type: "raster",
+      tiles: [`${window.location.origin}/api/rain-tiles/{z}/{x}/{y}?t=${stamp}`],
+      tileSize: 256,
+      attribution: "© OpenWeatherMap",
+    });
+    map.addLayer({
+      id: "rain-layer",
+      type: "raster",
+      source: "rain-tiles",
+      paint: {
+        "raster-opacity": RADAR_OPACITY,
+        "raster-opacity-transition": { duration: 300, delay: 0 },
+        "raster-brightness-max": 1,
+        "raster-contrast": 0.3,
+      },
+    });
+    return () => {
+      try {
+        if (map.getLayer("rain-layer")) map.removeLayer("rain-layer");
+        if (map.getSource("rain-tiles")) map.removeSource("rain-tiles");
+      } catch {
+        // The map was already removed (watchdog rebuild) — nothing to clean up.
+      }
+    };
+  }, [map, isLoaded, active, stamp]);
+}
+
+// Adds the rain overlay (looping RainViewer frames, or the OWM fallback) and
+// triggers onLoaded once the base map is ready.
 function RainOverlayLayer({
   location,
   onLoaded,
@@ -37,94 +243,15 @@ function RainOverlayLayer({
 }) {
   const { map, isLoaded } = useMap();
 
-  // Reveal the map as soon as it is ready — the radar layer pops in
-  // later when its frame index arrives.
+  // Reveal the map as soon as it is ready — the radar pops in later when its
+  // frame index arrives.
   useEffect(() => {
     if (!map || !isLoaded) return;
     onLoaded?.();
   }, [map, isLoaded, onLoaded]);
 
-  useEffect(() => {
-    if (!map || !isLoaded || radar === null) return;
-
-    const addRainLayer = (frame: RadarFrame | 'fallback', key: number) => {
-      const layerId = 'rain-layer';
-      const sourceId = 'rain-tiles';
-
-      const tileUrl =
-        frame === 'fallback'
-          ? `${window.location.origin}/api/rain-tiles/{z}/{x}/{y}?t=${key}`
-          : rainViewerTileUrl(frame);
-
-      // Remove existing layer/source if present
-      if (map.getLayer(layerId)) {
-        map.removeLayer(layerId);
-      }
-      if (map.getSource(sourceId)) {
-        map.removeSource(sourceId);
-      }
-
-      // Add the precipitation raster source: RainViewer's multi-colour radar
-      // composite by default, falling back to the OpenWeatherMap proxy when
-      // the RainViewer frame index couldn't be fetched.
-      if (frame === 'fallback') {
-        map.addSource(sourceId, {
-          type: 'raster',
-          tiles: [tileUrl],
-          tileSize: 256,
-          attribution: '© OpenWeatherMap'
-        });
-      } else {
-        map.addSource(sourceId, {
-          type: 'raster',
-          tiles: [tileUrl],
-          tileSize: 256,
-          // RainViewer's native max zoom is 7; the ZoomControl goes to 8, so
-          // this makes MapLibre overzoom instead of requesting missing tiles.
-          maxzoom: 7,
-          attribution:
-            'Weather data © <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a>'
-        });
-      }
-
-      // Add rain layer with transition for smooth opacity changes
-      map.addLayer({
-        id: layerId,
-        type: 'raster',
-        source: sourceId,
-        paint: {
-          'raster-opacity': 0.8,
-          'raster-opacity-transition': { duration: 300, delay: 0 },
-          'raster-brightness-max': 1,
-          'raster-contrast': 0.3
-        }
-      });
-    };
-
-    // `isLoaded` (from useMap) already tracks the map's own style-loaded
-    // state and flips false→true on every theme swap (see components/ui/map.tsx),
-    // so this effect re-running IS the "style changed" signal — no need for
-    // a second, independently-timed 'styledata' listener here. (A previous
-    // version raced its own listener registration against MapLibre's
-    // 'styledata' events during setStyle and could permanently lose the
-    // rain layer on a theme toggle.)
-    addRainLayer(radar, fallbackStamp);
-
-    return () => {
-      // Cleanup on unmount or before re-adding for a style/frame change. On a
-      // watchdog rebuild the map may already have been removed.
-      try {
-        if (map.getLayer('rain-layer')) {
-          map.removeLayer('rain-layer');
-        }
-        if (map.getSource('rain-tiles')) {
-          map.removeSource('rain-tiles');
-        }
-      } catch {
-        // The map was already removed (watchdog rebuild) — nothing to clean up.
-      }
-    };
-  }, [map, isLoaded, radar, fallbackStamp]);
+  const { shown, newest } = useRadarLoop(map, isLoaded, Array.isArray(radar) ? radar : null);
+  useFallbackLayer(map, isLoaded, radar === "fallback", fallbackStamp);
 
   // Consolidated fly-to effect for location AND zoom changes
   // Using a ref to track previous values to avoid redundant animations
@@ -161,7 +288,14 @@ function RainOverlayLayer({
     prevZoomRef.current = zoom;
   }, [map, location, zoom]);
 
-  return null;
+  // Portalled out of the aria-hidden map so it is readable; plan 016 places it.
+  if (!shown || !newest) return null;
+  return createPortal(
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40">
+      <RadarTimestamp frame={shown} newest={newest} />
+    </div>,
+    document.body
+  );
 }
 
 
