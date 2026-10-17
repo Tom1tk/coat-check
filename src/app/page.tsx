@@ -8,6 +8,7 @@ import NowcastCard from './components/kiosk/NowcastCard';
 import WeekRibbon from './components/kiosk/WeekRibbon';
 import SettingsSheet from './components/kiosk/SettingsSheet';
 import Reveal from './components/kiosk/Reveal';
+import { u } from './components/kiosk/units';
 import { useLocation } from './hooks/useLocation';
 import { useKioskParams } from './hooks/useKioskParams';
 import { useZoom } from './hooks/useZoom';
@@ -17,6 +18,7 @@ import { useScheduler } from './hooks/useScheduler';
 import { useRadar } from './hooks/useRadar';
 import { useClock } from './hooks/useClock';
 import { useMapPadding } from './hooks/useMapPadding';
+import { usePortrait } from './hooks/usePortrait';
 import { MAX_AGE_MS } from './utils/freshness';
 import { chipStatus } from './utils/statusChip';
 import { panelModel } from './utils/panelModel';
@@ -28,7 +30,8 @@ import { paletteFor } from './utils/moodPalettes';
 const formatTime = (ms: number) => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
 // The kiosk: map behind, panel left, nowcast top-right, week along the
-// bottom. Runs unattended — data refresh is the scheduler's job, and settings
+// bottom. On a portrait screen (layout B) the panel spans the top and the
+// nowcast bar and week stack along the bottom, with the map between. Runs unattended — data refresh is the scheduler's job, and settings
 // stay off-screen unless opened by `?settings` or a hold on the place name.
 export default function Home() {
   const params = useKioskParams();
@@ -50,9 +53,10 @@ export default function Home() {
   const mood = useMood(weather.forecast, now);
 
   const [panel, setPanel] = useState<HTMLElement | null>(null);
-  const [ribbon, setRibbon] = useState<HTMLElement | null>(null);
+  const [bottom, setBottom] = useState<HTMLElement | null>(null);
   const [legend, setLegend] = useState<HTMLElement | null>(null);
-  const padding = useMapPadding(panel, ribbon);
+  const portrait = usePortrait();
+  const padding = useMapPadding(panel, bottom, portrait);
 
   // One-time cleanup of the retired hourly-refresh bookkeeping (plan 013).
   useEffect(() => {
@@ -115,11 +119,23 @@ export default function Home() {
               place={location.name}
               chip={<StatusChip status={status} mood={view.model.mood} />}
               onPlaceHold={() => setSettingsOpen(true)}
+              portrait={portrait}
             />
-            <NowcastCard slots={view.slots} summary={view.summary}>
-              <div ref={setLegend} />
-            </NowcastCard>
-            <WeekRibbon ref={setRibbon} days={view.days} />
+            {portrait ? (
+              <div ref={setBottom} style={{ position: 'absolute', left: u(20), right: u(20), bottom: u(20), display: 'flex', flexDirection: 'column', gap: u(12) }}>
+                <NowcastCard slots={view.slots} summary={view.summary} portrait>
+                  <div ref={setLegend} />
+                </NowcastCard>
+                <WeekRibbon days={view.days} portrait />
+              </div>
+            ) : (
+              <>
+                <NowcastCard slots={view.slots} summary={view.summary}>
+                  <div ref={setLegend} />
+                </NowcastCard>
+                <WeekRibbon ref={setBottom} days={view.days} />
+              </>
+            )}
           </div>
         )}
       </Reveal>
@@ -133,6 +149,7 @@ export default function Home() {
         zoom={zoom}
         setZoom={setZoom}
         zoomPinned={params.zoom !== null}
+        portrait={portrait}
       />
     </main>
   );

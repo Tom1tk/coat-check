@@ -14,6 +14,7 @@ interface SettingsSheetProps {
     zoom: number;
     setZoom: (z: number) => void;
     zoomPinned: boolean;
+    portrait?: boolean;
 }
 
 const ZOOM_LABEL: Readonly<Record<number, string>> = { 8: 'City', 7: 'County', 6: 'Region', 5: 'Country' };
@@ -41,10 +42,9 @@ export default function SettingsSheet(p: SettingsSheetProps) {
             className="kiosk-surface"
             style={{
                 position: 'absolute',
-                top: u(32),
-                right: u(32),
-                width: u(440),
-                maxHeight: `calc(100% - ${u(64)})`,
+                ...(p.portrait
+                    ? { top: u(20), left: u(20), right: u(20), maxHeight: `calc(100% - ${u(40)})` }
+                    : { top: u(32), right: u(32), width: u(440), maxHeight: `calc(100% - ${u(64)})` }),
                 overflowY: 'auto',
                 boxSizing: 'border-box',
                 padding: u(32),

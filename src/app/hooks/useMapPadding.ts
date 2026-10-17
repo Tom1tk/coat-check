@@ -1,44 +1,32 @@
 import { useEffect, useState } from 'react';
+import { mapPadding, MapPadding, NO_PADDING, samePadding } from '../utils/mapPadding';
 
-export interface MapPadding {
-    top: number;
-    right: number;
-    bottom: number;
-    left: number;
-}
+export type { MapPadding } from '../utils/mapPadding';
 
-const NONE: MapPadding = { top: 0, right: 0, bottom: 0, left: 0 };
-
-const same = (a: MapPadding, b: MapPadding) =>
-    a.top === b.top && a.right === b.right && a.bottom === b.bottom && a.left === b.left;
-
-// The map padding that keeps the location centred in the free area: right of
-// the panel and above the ribbon. Measured from the elements themselves
-// (ResizeObserver + window resize), so it follows any screen size.
-export function useMapPadding(panel: HTMLElement | null, ribbon: HTMLElement | null): MapPadding {
-    const [padding, setPadding] = useState<MapPadding>(NONE);
+// The map padding that keeps the location centred in the free area between
+// the panel and whatever runs along the bottom (see utils/mapPadding).
+// Measured from the elements themselves (ResizeObserver + window resize), so
+// it follows any screen size and either orientation.
+export function useMapPadding(panel: HTMLElement | null, bottom: HTMLElement | null, portrait = false): MapPadding {
+    const [padding, setPadding] = useState<MapPadding>(NO_PADDING);
 
     useEffect(() => {
-        if (!panel || !ribbon) return;
+        if (!panel || !bottom) return;
         const measure = () => {
-            const next = {
-                top: 0,
-                right: 0,
-                left: Math.round(panel.getBoundingClientRect().right),
-                bottom: Math.round(window.innerHeight - ribbon.getBoundingClientRect().top),
-            };
-            setPadding((prev) => (same(prev, next) ? prev : next));
+            const box = panel.getBoundingClientRect();
+            const next = mapPadding(portrait, portrait ? box.bottom : box.right, bottom.getBoundingClientRect().top, window.innerHeight);
+            setPadding((prev) => (samePadding(prev, next) ? prev : next));
         };
         measure();
         const observer = new ResizeObserver(measure);
         observer.observe(panel);
-        observer.observe(ribbon);
+        observer.observe(bottom);
         window.addEventListener('resize', measure);
         return () => {
             observer.disconnect();
             window.removeEventListener('resize', measure);
         };
-    }, [panel, ribbon]);
+    }, [panel, bottom, portrait]);
 
     return padding;
 }

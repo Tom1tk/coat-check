@@ -138,6 +138,15 @@
   color: var(--ink);
 }
 
+/* Portrait screens (phones, rotated displays) stack the kiosk into one column
+   drawn at a 560-wide reference, so the panel keeps its proportions and text
+   stays readable. Must match PORTRAIT_QUERY in hooks/usePortrait.ts. */
+@media (orientation: portrait) {
+  .kiosk-root {
+    --u: min(calc(100vw / 560), calc(100vh / 1150));
+  }
+}
+
 .kiosk-root .tn {
   font-variant-numeric: tabular-nums;
 }

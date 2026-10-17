@@ -15,6 +15,8 @@ import WeekRibbon from '@/app/components/kiosk/WeekRibbon';
 import RadarTimestamp from '@/app/components/RadarTimestamp';
 import RainViewerBackground from '@/app/components/RainViewerBackground';
 import { useMapPadding } from '@/app/hooks/useMapPadding';
+import { usePortrait } from '@/app/hooks/usePortrait';
+import { u } from '@/app/components/kiosk/units';
 import StatusChip from '@/app/components/StatusChip';
 import SettingsSheet from '@/app/components/kiosk/SettingsSheet';
 
@@ -40,11 +42,13 @@ function DevKiosk() {
     const days = useMemo(() => weekRibbon(FORECAST, now), [now]);
     const slots = useMemo(() => nextTwoHours(FORECAST, now), [now]);
     const [panel, setPanel] = useState<HTMLElement | null>(null);
-    const [ribbon, setRibbon] = useState<HTMLElement | null>(null);
-    const padding = useMapPadding(panel, ribbon);
+    const [bottom, setBottom] = useState<HTMLElement | null>(null);
+    const portrait = usePortrait();
+    const padding = useMapPadding(panel, bottom, portrait);
     const [settings, setSettings] = useState(() => params.has('settings'));
     const [zoom, setZoom] = useState(8);
     const newest = { time: Math.floor(now.getTime() / 600_000) * 600, path: '', host: '' };
+    const legend = <RadarTimestamp frame={{ ...newest, time: newest.time - 2400 }} newest={newest} />;
 
     return (
         <div className="kiosk-root fixed inset-0 overflow-hidden" style={{ background: `linear-gradient(135deg, ${palette.bg[0]}, ${palette.bg[1]})` }}>
@@ -64,11 +68,23 @@ function DevKiosk() {
                 place="Cambridge"
                 onPlaceHold={() => setSettings(true)}
                 chip={<StatusChip status={{ tone: 'fresh', text: `Updated ${model.time}`, radarDown: false }} mood={model.mood} />}
+                portrait={portrait}
             />
-            <NowcastCard slots={slots} summary={nowcastSummary(slots)}>
-                <RadarTimestamp frame={{ ...newest, time: newest.time - 2400 }} newest={newest} />
-            </NowcastCard>
-            <WeekRibbon ref={setRibbon} days={days} />
+            {portrait ? (
+                <div ref={setBottom} style={{ position: 'absolute', left: u(20), right: u(20), bottom: u(20), display: 'flex', flexDirection: 'column', gap: u(12) }}>
+                    <NowcastCard slots={slots} summary={nowcastSummary(slots)} portrait>
+                        {legend}
+                    </NowcastCard>
+                    <WeekRibbon days={days} portrait />
+                </div>
+            ) : (
+                <>
+                    <NowcastCard slots={slots} summary={nowcastSummary(slots)}>
+                        {legend}
+                    </NowcastCard>
+                    <WeekRibbon ref={setBottom} days={days} />
+                </>
+            )}
             <SettingsSheet
                 open={settings}
                 onClose={() => setSettings(false)}
@@ -78,6 +94,7 @@ function DevKiosk() {
                 zoom={zoom}
                 setZoom={setZoom}
                 zoomPinned={false}
+                portrait={portrait}
             />
         </div>
     );
