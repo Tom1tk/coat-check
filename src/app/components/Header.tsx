@@ -38,7 +38,8 @@ export default function Header({
             </h1>
 
             {/* 📍 Change Location */}
-            <LocationSearch location={location} setLocation={setLocation} />
+            <p className="mt-2 text-black dark:text-white">📍 {location.name}</p>
+            <LocationSearch setLocation={setLocation} />
         </header>
     );
 }

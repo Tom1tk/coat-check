@@ -13,13 +13,15 @@ import RadarTimestamp from '@/app/components/RadarTimestamp';
 import RainViewerBackground from '@/app/components/RainViewerBackground';
 import { useMapPadding } from '@/app/hooks/useMapPadding';
 import StatusChip from '@/app/components/StatusChip';
+import SettingsSheet from '@/app/components/kiosk/SettingsSheet';
 
 // Dev-only review of the kiosk layout against the 014 fixture, no network.
 // `?at=YYYY-MM-DDTHH:MM` (location-local) fixes the clock; `?dark` uses G2;
-// `?map` adds the live base map (network) to check the padding.
+// `?map` adds the live base map (network) to check the padding; `?settings`
+// opens the settings sheet (also: hold the place name for 3 s).
 const FORECAST = parseForecast(fixture);
 const DEFAULT_AT = FORECAST.current.time;
-const CAMBRIDGE = { latitude: 52.2053, longitude: 0.1218 };
+const CAMBRIDGE = { name: 'Cambridge', latitude: 52.2053, longitude: 0.1218 };
 
 function DevKiosk() {
     const params = useSearchParams();
@@ -32,6 +34,8 @@ function DevKiosk() {
     const [panel, setPanel] = useState<HTMLElement | null>(null);
     const [ribbon, setRibbon] = useState<HTMLElement | null>(null);
     const padding = useMapPadding(panel, ribbon);
+    const [settings, setSettings] = useState(() => params.has('settings'));
+    const [zoom, setZoom] = useState(8);
     const newest = { time: Math.floor(now.getTime() / 600_000) * 600, path: '', host: '' };
 
     return (
@@ -42,12 +46,23 @@ function DevKiosk() {
                 ref={setPanel}
                 model={model}
                 place="Cambridge"
+                onPlaceHold={() => setSettings(true)}
                 chip={<StatusChip status={{ tone: 'fresh', text: `Updated ${model.time}`, radarDown: false }} mood={model.mood} />}
             />
             <NowcastCard slots={slots} summary={nowcastSummary(slots)}>
                 <RadarTimestamp frame={{ ...newest, time: newest.time - 2400 }} newest={newest} />
             </NowcastCard>
             <WeekRibbon ref={setRibbon} days={days} />
+            <SettingsSheet
+                open={settings}
+                onClose={() => setSettings(false)}
+                location={CAMBRIDGE}
+                setLocation={() => setSettings(false)}
+                locationPinned={false}
+                zoom={zoom}
+                setZoom={setZoom}
+                zoomPinned={false}
+            />
         </div>
     );
 }

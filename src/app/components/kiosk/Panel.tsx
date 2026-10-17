@@ -9,7 +9,19 @@ import WindowCard from './WindowCard';
 import { u } from './units';
 
 // The left glass panel of boards G1/G2.
-export default function Panel({ model, place, chip, ref }: { model: PanelModel; place: string; chip: ReactNode; ref?: Ref<HTMLElement> }) {
+export default function Panel({
+    model,
+    place,
+    chip,
+    onPlaceHold,
+    ref,
+}: {
+    model: PanelModel;
+    place: string;
+    chip: ReactNode;
+    onPlaceHold?: () => void;
+    ref?: Ref<HTMLElement>;
+}) {
     return (
         <section
             ref={ref}
@@ -30,7 +42,7 @@ export default function Panel({ model, place, chip, ref }: { model: PanelModel; 
                 overflow: 'hidden',
             }}
         >
-            <Clock time={model.time} date={model.date} place={place} chip={chip} />
+            <Clock time={model.time} date={model.date} place={place} chip={chip} onPlaceHold={onPlaceHold} />
             <Verdict heading={model.heading} verdict={model.verdict} text={model.verdictText} reason={model.reason} />
             {model.cards.length > 0 && (
                 <div style={{ display: 'grid', gridTemplateColumns: `repeat(${model.cards.length}, minmax(0, 1fr))`, gap: u(14) }}>
