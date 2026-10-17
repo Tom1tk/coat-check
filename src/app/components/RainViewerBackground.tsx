@@ -120,8 +120,8 @@ function RainOverlayLayer({
         if (map.getSource('rain-tiles')) {
           map.removeSource('rain-tiles');
         }
-      } catch (err) {
-        console.debug('[RainViewer] layer cleanup skipped:', err);
+      } catch {
+        // The map was already removed (watchdog rebuild) — nothing to clean up.
       }
     };
   }, [map, isLoaded, radar, fallbackStamp]);
