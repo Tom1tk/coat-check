@@ -54,7 +54,7 @@ function ensureFrameLayer(map: MapInstance, frame: RadarFrame) {
       tiles: [rainViewerTileUrl(frame)],
       tileSize: 512,
       // RainViewer's native max zoom is 7 (z8 returns an error image); the
-      // ZoomControl goes to 8, so MapLibre overzooms instead.
+      // zoom setting goes to 8, so MapLibre overzooms instead.
       maxzoom: 7,
       attribution: RAINVIEWER_ATTRIBUTION,
     });

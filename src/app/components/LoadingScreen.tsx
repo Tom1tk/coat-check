@@ -1,18 +1,17 @@
-import React from 'react';
+import type { ReactNode } from 'react';
+import { u } from './kiosk/units';
 
-interface LoadingScreenProps {
-    visible: boolean;
-    FADE_DURATION: number;
-}
-
-export default function LoadingScreen({ visible, FADE_DURATION }: LoadingScreenProps) {
+// Shown until the first forecast (cached or live) arrives; the status chip
+// rides along so a kiosk that can't reach the network says so.
+export default function LoadingScreen({ chip }: { chip: ReactNode }) {
     return (
         <div
-            className={`absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-blue-200 to-blue-300 text-black z-50 transition-opacity ${visible ? 'opacity-100' : 'opacity-0'
-                }`}
-            style={{ transitionDuration: `${FADE_DURATION}ms` }}
+            style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: u(20) }}
         >
-            <p className="text-2xl font-semibold animate-pulse">Loading weather data...</p>
+            <p className="animate-pulse" style={{ fontFamily: 'var(--font-display)', fontSize: u(56), color: 'var(--ink)' }}>
+                Checking the sky…
+            </p>
+            {chip}
         </div>
     );
 }
