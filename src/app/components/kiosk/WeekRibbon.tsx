@@ -63,7 +63,7 @@ function Day({ d, portrait }: { d: RibbonDay; portrait: boolean }) {
         return (
             <>
                 <span style={{ fontSize: u(17), fontWeight: 600 }}>{d.day}</span>
-                <WeatherIcon code={d.code} size={u(32)} strokeWidth={1.5} />
+                <WeatherIcon code={d.code} size={u(28)} strokeWidth={1.5} />
                 <span className="tn" style={{ fontSize: u(26), fontWeight: 500, lineHeight: 1 }}>{Math.round(d.max)}°</span>
                 <span className="tn" style={{ fontSize: u(18), fontWeight: 300, lineHeight: 1, color: 'var(--ink-muted)' }}>{Math.round(d.min)}°</span>
                 {pct}
@@ -93,7 +93,7 @@ function Day({ d, portrait }: { d: RibbonDay; portrait: boolean }) {
 // the stack, which places it.
 const PLACEMENT = {
     landscape: { position: 'absolute', left: u(632), right: u(32), bottom: u(32), height: u(280), padding: u(18) },
-    portrait: { position: 'relative', padding: u(10) },
+    portrait: { position: 'relative', padding: u(8) },
 } as const;
 
 // Today + 6 days.
@@ -120,8 +120,8 @@ export default function WeekRibbon({ days, portrait = false, ref }: { days: Ribb
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
-                        gap: u(portrait ? 6 : 8),
-                        padding: portrait ? `${u(12)} 0` : `${u(14)} ${u(8)}`,
+                        gap: u(portrait ? 5 : 8),
+                        padding: portrait ? `${u(10)} 0` : `${u(14)} ${u(8)}`,
                         borderRadius: radius(d),
                         background: background(d, i),
                         marginLeft: marginLeft(days, i, portrait ? 4 : GAP),

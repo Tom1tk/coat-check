@@ -3,8 +3,8 @@ import type { ReactNode } from 'react';
 import type { NowcastSlot } from '@/app/utils/nowcast';
 import { eyebrow, u } from './units';
 
-const BAR_AREA = 70;
-const BAR_MAX = 64;
+const BAR_MAX = 64; // tallest bar; the portrait row draws them at half height
+const PORTRAIT_SCALE = 0.5;
 const FULL_SCALE_MM = 0.5; // per 15 min; heavier slots draw at full height
 
 function barColour(mm: number): string {
@@ -13,17 +13,17 @@ function barColour(mm: number): string {
     return 'var(--rain-lo)';
 }
 
-const barHeight = (mm: number) => Math.min(BAR_MAX, Math.max(3, Math.round((mm / FULL_SCALE_MM) * BAR_MAX)));
+const barHeight = (mm: number, max: number) => Math.min(max, Math.max(3, Math.round((mm / FULL_SCALE_MM) * max)));
 
-function Bars({ slots, labels }: { slots: NowcastSlot[]; labels: boolean }) {
+function Bars({ slots, labels, max }: { slots: NowcastSlot[]; labels: boolean; max: number }) {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: u(8), flex: '1 1 0', minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: u(8), height: u(BAR_AREA) }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: u(8), height: u(max + 6) }}>
                 {slots.map((s) => (
                     <div
                         key={s.time}
                         title={`${s.time} · ${s.mm} mm`}
-                        style={{ flex: '1 1 0', height: u(barHeight(s.mm)), borderRadius: `${u(4)} ${u(4)} ${u(2)} ${u(2)}`, background: barColour(s.mm) }}
+                        style={{ flex: '1 1 0', height: u(barHeight(s.mm, max)), borderRadius: `${u(4)} ${u(4)} ${u(2)} ${u(2)}`, background: barColour(s.mm) }}
                     />
                 ))}
             </div>
@@ -61,13 +61,13 @@ export default function NowcastCard({
                 <section
                     className="kiosk-surface"
                     aria-label="Next 2 hours"
-                    style={{ width: '100%', boxSizing: 'border-box', padding: `${u(16)} ${u(20)}`, borderRadius: u(22), display: 'flex', alignItems: 'center', gap: u(18) }}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: `${u(14)} ${u(20)}`, borderRadius: u(22), display: 'flex', alignItems: 'flex-end', gap: u(18) }}
                 >
                     <div style={{ display: 'flex', flexDirection: 'column', gap: u(4), flex: '0 1 auto', minWidth: 0 }}>
                         <span style={eyebrow}>NEXT 2 HOURS</span>
-                        <span style={{ fontSize: u(20), fontWeight: 500 }}>{summary}</span>
+                        <span style={{ fontSize: u(18), fontWeight: 500 }}>{summary}</span>
                     </div>
-                    {slots.length > 0 && <Bars slots={slots} labels={false} />}
+                    {slots.length > 0 && <Bars slots={slots} labels={false} max={BAR_MAX * PORTRAIT_SCALE} />}
                 </section>
             </div>
         );
@@ -84,7 +84,7 @@ export default function NowcastCard({
                     <span style={{ fontSize: u(13), color: 'var(--ink-muted)' }}>rain per 15 min</span>
                 </div>
                 <span style={{ fontSize: u(22), fontWeight: 500 }}>{summary}</span>
-                {slots.length > 0 && <Bars slots={slots} labels />}
+                {slots.length > 0 && <Bars slots={slots} labels max={BAR_MAX} />}
             </section>
             {children}
         </div>
