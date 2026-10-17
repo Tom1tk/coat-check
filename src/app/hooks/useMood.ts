@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Forecast, isDaytime } from '../utils/forecast';
-import { advanceMood, getMood, isDarkMood, Mood, MoodTrack } from '../utils/mood';
+import { Forecast } from '../utils/forecast';
+import { advanceMood, getMood, isNight, Mood, MoodTrack } from '../utils/mood';
 
 // Once the first mood is on screen, colour changes crossfade (globals.css);
 // the first one applies at once so boot doesn't fade in from the default.
@@ -29,7 +29,7 @@ export function useMood(forecast: Forecast | null, nowMs: number): ScreenMood | 
     }
 
     const screen = track && forecast
-        ? { mood: track.state.mood, dark: isDarkMood(track.state.mood, isDaytime(forecast, new Date(nowMs))) }
+        ? { mood: track.state.mood, dark: isNight(forecast, new Date(nowMs)) }
         : null;
     useMoodAttributes(screen);
     return screen;

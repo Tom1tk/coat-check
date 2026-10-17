@@ -2,8 +2,8 @@
 import { Suspense, useMemo, useState } from 'react';
 import { notFound, useSearchParams } from 'next/navigation';
 import fixture from '@/app/utils/__fixtures__/forecast-cambridge.json';
-import { isDaytime, parseForecast, parseLocal } from '@/app/utils/forecast';
-import { getMood, isDarkMood, Mood, MOODS } from '@/app/utils/mood';
+import { parseForecast, parseLocal } from '@/app/utils/forecast';
+import { getMood, isNight, Mood, MOODS } from '@/app/utils/mood';
 import { paletteFor } from '@/app/utils/moodPalettes';
 import { useMoodAttributes } from '@/app/hooks/useMood';
 import { panelModel } from '@/app/utils/panelModel';
@@ -23,7 +23,7 @@ import SettingsSheet from '@/app/components/kiosk/SettingsSheet';
 // Dev-only review of the kiosk layout against the 014 fixture, no network.
 // `?at=YYYY-MM-DDTHH:MM` (location-local) fixes the clock; `?mood=<mood>`
 // previews a weather mood (otherwise the fixture's own at that time) and
-// `?dark` its after-sunset variant; `?map` adds the live base map (network) to check the padding; `?settings`
+// `?dark` its night palette (otherwise the sun decides); `?map` adds the live base map (network) to check the padding; `?settings`
 // opens the settings sheet (also: hold the place name for 3 s).
 const FORECAST = parseForecast(fixture);
 const DEFAULT_AT = FORECAST.current.time;
@@ -35,7 +35,7 @@ function DevKiosk() {
     const now = useMemo(() => new Date(parseLocal(at).getTime() - FORECAST.utcOffsetSeconds * 1000), [at]);
     const asked = params.get('mood');
     const mood: Mood = MOODS.find((m) => m === asked) ?? getMood(FORECAST, now);
-    const dark = isDarkMood(mood, !params.has('dark') && isDaytime(FORECAST, now));
+    const dark = params.has('dark') || isNight(FORECAST, now);
     const palette = paletteFor(mood, dark);
     useMoodAttributes({ mood, dark });
     const model = useMemo(() => panelModel(FORECAST, now), [now]);

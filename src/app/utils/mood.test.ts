@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildForecast, HourValues } from './__fixtures__/buildForecast';
-import { isDaytime } from './forecast';
-import { advanceMood, getMood, isDarkMood, Mood, MoodState, stableMood } from './mood';
+import { advanceMood, getMood, isNight, Mood, MoodState, stableMood } from './mood';
 
 // 2026-10-19 is a Monday; offset 0 so instants read as local time. The
 // builder's sun is up 07:00–18:00.
@@ -24,7 +23,7 @@ describe('getMood', () => {
         ['wet code → rain', { code: 61 }, '12:10', 'rain'],
         ['probability → rain', { probability: 60 }, '12:10', 'rain'],
         ['feels-like ≤ 2 °C → frost', { feelsLike: 2 }, '12:10', 'frost'],
-        ['dark and quiet → night', {}, '21:10', 'night'],
+        ['dark and quiet → clear (the night palette is the sun\'s job)', {}, '21:10', 'clear'],
         ['overcast code → overcast', { code: 3 }, '12:10', 'overcast'],
         ['fog → overcast', { code: 45 }, '12:10', 'overcast'],
         ['partly cloudy → clear', { code: 2 }, '12:10', 'clear'],
@@ -52,22 +51,19 @@ describe('getMood', () => {
         expect(getMood(later, at('13:10'))).toBe('rain');
     });
 
-    it('outside the forecast falls back on day/night', () => {
+    it('outside the forecast falls back on clear', () => {
         const f = buildForecast(DAY, { days: 1 });
         const t = new Date('2026-11-01T12:00:00Z');
-        expect(getMood(f, t)).toBe(isDaytime(f, t) ? 'clear' : 'night');
+        expect(getMood(f, t)).toBe('clear');
     });
 });
 
-describe('isDarkMood', () => {
-    it('rain, storm and night are dark; frost only after sunset', () => {
-        expect(isDarkMood('rain', true)).toBe(true);
-        expect(isDarkMood('storm', true)).toBe(true);
-        expect(isDarkMood('night', false)).toBe(true);
-        expect(isDarkMood('frost', true)).toBe(false);
-        expect(isDarkMood('frost', false)).toBe(true);
-        expect(isDarkMood('clear', true)).toBe(false);
-        expect(isDarkMood('overcast', true)).toBe(false);
+describe('isNight', () => {
+    it('follows the sun, whatever the weather', () => {
+        const f = ahead({ code: 63 });
+        expect(isNight(f, at('12:10'))).toBe(false);
+        expect(isNight(f, at('21:10'))).toBe(true);
+        expect(isNight(f, at('06:10'))).toBe(true);
     });
 });
 
@@ -99,8 +95,8 @@ describe('advanceMood', () => {
         expect(advanceMood(blip, 'rain', false).state.mood).toBe('clear');
     });
 
-    it('the clock alone changes the mood at once (e.g. sunset)', () => {
+    it('the clock alone changes the mood at once (e.g. rain coming into the window)', () => {
         const day = advanceMood(null, 'clear', true);
-        expect(advanceMood(day, 'night', false).state.mood).toBe('night');
+        expect(advanceMood(day, 'rain', false).state.mood).toBe('rain');
     });
 });

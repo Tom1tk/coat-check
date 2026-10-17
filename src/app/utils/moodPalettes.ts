@@ -1,9 +1,11 @@
-import { mix, over, parseColour, toHex, withAlpha } from './colour';
+import { contrast, mix, over, parseColour, Rgba, toHex, withAlpha } from './colour';
 import { Mood, MOODS } from './mood';
 
 // The kiosk's colour tokens — the single source for the CSS, which layout.tsx
-// renders from moodCss(). The two bases are boards G1 (light) and G2 (dark);
-// each mood overrides them with board F's panel, ink and swatch.
+// renders from moodCss(). "Sun and Sky": the sun picks day or night, the
+// weather picks the colour. Days are saturated, Apple-Weather-like panels
+// with white ink (VIVID_BASE), except overcast, which stays pale (board G1);
+// nights are board G2 tinted with each mood's hue.
 
 export type Token =
     | 'map-tint' | 'surface' | 'surface-border' | 'surface-shadow'
@@ -45,6 +47,36 @@ export const LIGHT_BASE: Tokens = {
     'back-win': 'rgba(180, 64, 11, 0.12)',
 };
 
+// White ink on a saturated panel: the clear, rain, frost and storm days.
+export const VIVID_BASE: Tokens = {
+    'map-tint': 'rgba(255, 255, 255, 0)',
+    surface: 'rgba(255, 255, 255, 0.18)',
+    'surface-border': 'rgba(255, 255, 255, 0.28)',
+    'surface-shadow': '0 20px 60px rgba(0, 0, 0, 0.18)',
+    ink: '#ffffff',
+    'ink-sub': '#ffffff',
+    'ink-muted': '#ffffff',
+    'accent-coat': '#ffc48a',
+    'coat-bg': 'rgba(255, 196, 138, 0.22)',
+    'coat-fg': '#ffe0c2',
+    'coat-card': 'rgba(255, 255, 255, 0.12)',
+    'ok-bg': 'rgba(255, 255, 255, 0.18)',
+    'ok-fg': '#d5fbf3',
+    card: 'rgba(255, 255, 255, 0.12)',
+    'rain-hi': '#ffffff',
+    'rain-mid': 'rgba(255, 255, 255, 0.6)',
+    'rain-lo': 'rgba(255, 255, 255, 0.28)',
+    'pct-hi': '#d6efff',
+    'weekend-tint': 'rgba(255, 255, 255, 0.08)',
+    'today-tint': 'rgba(255, 255, 255, 0.14)',
+    divider: 'rgba(255, 255, 255, 0.18)',
+    icon: '#ffffff',
+    'rain-icon': '#d6efff',
+    'sun-icon': '#ffd66b',
+    'out-win': 'rgba(167, 243, 228, 0.16)',
+    'back-win': 'rgba(255, 196, 138, 0.18)',
+};
+
 export const DARK_BASE: Tokens = {
     'map-tint': 'rgba(30, 58, 90, 0.14)',
     surface: 'rgba(14, 24, 36, 0.82)',
@@ -74,72 +106,91 @@ export const DARK_BASE: Tokens = {
     'back-win': 'rgba(253, 186, 116, 0.14)',
 };
 
-// Board F, per mood: the screen background (its gradient stops), the panel,
-// the ink, and the swatch the basemap is washed with.
+export type Base = 'light' | 'vivid' | 'dark';
+
+const BASES: Readonly<Record<Base, Tokens>> = { light: LIGHT_BASE, vivid: VIVID_BASE, dark: DARK_BASE };
+
+// One mood at one time of day: the screen background (its gradient stops),
+// the panel, the ink, and the swatch the basemap is washed with.
 interface MoodSpec {
-    dark: boolean;
+    base: Base;
     bg: readonly [string, string];
     panel: string;
     fg: string;
     swatch: string;
-    okFg?: string;
 }
 
-const CLEAR: MoodSpec = { dark: false, bg: ['#fdf3e1', '#f6d9a8'], panel: 'rgba(255,250,240,0.82)', fg: '#2a1d0e', swatch: '#f2c27b', okFg: '#0f766e' };
-const OVERCAST: MoodSpec = { dark: false, bg: ['#e7eaed', '#cbd2d9'], panel: 'rgba(248,249,250,0.82)', fg: '#1e252c', swatch: '#b8c0c8' };
-const RAIN: MoodSpec = { dark: true, bg: ['#132538', '#1f3b5b'], panel: 'rgba(12,22,34,0.80)', fg: '#e6eef6', swatch: '#1e3a5a' };
-const FROST: MoodSpec = { dark: false, bg: ['#f2f8fc', '#cfe6f6'], panel: 'rgba(250,253,255,0.84)', fg: '#0c2536', swatch: '#bfe0f5' };
-const STORM: MoodSpec = { dark: true, bg: ['#1c1828', '#3a2d55'], panel: 'rgba(20,16,30,0.80)', fg: '#ece8f6', swatch: '#3b2f55' };
-const NIGHT: MoodSpec = { dark: true, bg: ['#090f1f', '#141d36'], panel: 'rgba(10,14,28,0.78)', fg: '#dfe5f3', swatch: '#141d36' };
-// Board F has no night frost: night's panel and ink, washed with frost's swatch.
-const FROST_NIGHT: MoodSpec = { ...NIGHT, swatch: FROST.swatch };
+// The basemap wash: strong on vivid days so the map reads as the sky's
+// colour, lighter on pale overcast, in between at night.
+const MAP_TINT_ALPHA: Readonly<Record<Base, number>> = { light: 0.12, vivid: 0.45, dark: 0.3 };
 
-const MAP_TINT_ALPHA = 0.12;
+const DAY: Readonly<Record<Mood, MoodSpec>> = {
+    clear: { base: 'vivid', bg: ['#1e8cff', '#86ccff'], panel: 'rgba(10,96,210,0.86)', fg: '#ffffff', swatch: '#2a9bff' },
+    overcast: { base: 'light', bg: ['#dfe4ea', '#b4bec9'], panel: 'rgba(244,246,249,0.86)', fg: '#1e252c', swatch: '#aab4bf' },
+    rain: { base: 'vivid', bg: ['#4f6277', '#7a8ca0'], panel: 'rgba(52,68,86,0.82)', fg: '#ffffff', swatch: '#5b7088' },
+    frost: { base: 'vivid', bg: ['#2a9fb5', '#8fd6e2'], panel: 'rgba(10,86,104,0.86)', fg: '#ffffff', swatch: '#3fb0c4' },
+    storm: { base: 'vivid', bg: ['#4a3d6e', '#7d6ca6'], panel: 'rgba(66,50,104,0.84)', fg: '#ffffff', swatch: '#6a5596' },
+};
+
+const NIGHT: Readonly<Record<Mood, MoodSpec>> = {
+    clear: { base: 'dark', bg: ['#081a44', '#143a80'], panel: 'rgba(8,24,62,0.80)', fg: '#e3ecff', swatch: '#2f62c8' },
+    overcast: { base: 'dark', bg: ['#1a1f27', '#343c48'], panel: 'rgba(26,31,40,0.82)', fg: '#e6eaf0', swatch: '#6b7686' },
+    rain: { base: 'dark', bg: ['#16273a', '#2b4560'], panel: 'rgba(18,30,44,0.80)', fg: '#e6eef6', swatch: '#4a6684' },
+    frost: { base: 'dark', bg: ['#05262e', '#0e4c58'], panel: 'rgba(4,34,42,0.80)', fg: '#ddf6fa', swatch: '#1fa3b6' },
+    storm: { base: 'dark', bg: ['#1e1436', '#432a72'], panel: 'rgba(28,16,50,0.80)', fg: '#eee6ff', swatch: '#7048b8' },
+};
+
+// How far the secondary inks fade toward the panel, at most; on a saturated
+// panel they fade less, so they never drop below AA (CONTRAST_FLOOR).
 const INK_SUB_WEIGHT = 0.82;
 const INK_MUTED_WEIGHT = 0.66;
+const CONTRAST_FLOOR = 4.5;
+const WEIGHT_STEP = 0.02;
 
 export interface Palette {
     mood: Mood;
     dark: boolean;
-    // Board F's background stops, for the contrast test.
+    base: Base;
+    // The screen background's stops, for the contrast test.
     bg: readonly [string, string];
     tokens: Tokens;
 }
 
-function palette(mood: Mood, spec: MoodSpec): Palette {
-    const ink = parseColour(spec.fg);
-    // Secondary inks are the ink faded toward the panel as it reads over
-    // board F's background, so every mood keeps the same hierarchy.
-    const panel = over(parseColour(spec.panel), parseColour(spec.bg[1]));
-    const tokens: Tokens = {
-        ...(spec.dark ? DARK_BASE : LIGHT_BASE),
-        'map-tint': withAlpha(parseColour(spec.swatch), MAP_TINT_ALPHA),
-        surface: spec.panel,
-        ink: spec.fg,
-        'ink-sub': toHex(mix(ink, panel, INK_SUB_WEIGHT)),
-        'ink-muted': toHex(mix(ink, panel, INK_MUTED_WEIGHT)),
-        ...(spec.okFg ? { 'ok-fg': spec.okFg } : {}),
-    };
-    return { mood, dark: spec.dark, bg: spec.bg, tokens };
+// Ink faded toward the panel by `weight`, or less if that would read below
+// the floor over either background stop.
+function secondaryInk(ink: Rgba, spec: MoodSpec, weight: number): string {
+    const panel = parseColour(spec.panel);
+    const surfaces = spec.bg.map((stop) => over(panel, parseColour(stop)));
+    const faded = (w: number) => mix(ink, surfaces[1], w);
+    const readable = (w: number) => surfaces.every((s) => contrast(faded(w), s) >= CONTRAST_FLOOR);
+    let w = weight;
+    while (w < 1 && !readable(w)) w = Math.min(1, w + WEIGHT_STEP);
+    return toHex(faded(w));
 }
 
-export const PALETTES: Readonly<Record<Mood, Palette>> = {
-    clear: palette('clear', CLEAR),
-    overcast: palette('overcast', OVERCAST),
-    rain: palette('rain', RAIN),
-    frost: palette('frost', FROST),
-    storm: palette('storm', STORM),
-    night: palette('night', NIGHT),
-};
+function palette(mood: Mood, dark: boolean): Palette {
+    const spec = (dark ? NIGHT : DAY)[mood];
+    const ink = parseColour(spec.fg);
+    const tokens: Tokens = {
+        ...BASES[spec.base],
+        'map-tint': withAlpha(parseColour(spec.swatch), MAP_TINT_ALPHA[spec.base]),
+        surface: spec.panel,
+        ink: spec.fg,
+        'ink-sub': secondaryInk(ink, spec, INK_SUB_WEIGHT),
+        'ink-muted': secondaryInk(ink, spec, INK_MUTED_WEIGHT),
+    };
+    return { mood, dark, base: spec.base, bg: spec.bg, tokens };
+}
 
-// Dark variants of light moods, used after sunset (see isDarkMood).
-export const DARK_VARIANTS: Readonly<Partial<Record<Mood, Palette>>> = {
-    frost: palette('frost', FROST_NIGHT),
-};
+const build = (dark: boolean) =>
+    Object.fromEntries(MOODS.map((m) => [m, palette(m, dark)])) as Record<Mood, Palette>;
+
+export const DAY_PALETTES: Readonly<Record<Mood, Palette>> = build(false);
+export const NIGHT_PALETTES: Readonly<Record<Mood, Palette>> = build(true);
 
 export const ALL_PALETTES: readonly Palette[] = [
-    ...MOODS.map((m) => PALETTES[m]),
-    ...Object.values(DARK_VARIANTS),
+    ...MOODS.map((m) => DAY_PALETTES[m]),
+    ...MOODS.map((m) => NIGHT_PALETTES[m]),
 ];
 
 const declarations = (tokens: Tokens) =>
@@ -153,13 +204,11 @@ const declarations = (tokens: Tokens) =>
 export function moodCss(): string {
     return [
         `:root:not([data-mood]){${declarations(LIGHT_BASE)}}`,
-        ...MOODS.map((m) => `:root[data-mood="${m}"]{${declarations(PALETTES[m].tokens)}}`),
-        ...Object.entries(DARK_VARIANTS).map(
-            ([m, p]) => `:root[data-mood="${m}"][data-dark]{${declarations(p!.tokens)}}`
-        ),
+        ...MOODS.map((m) => `:root[data-mood="${m}"]{${declarations(DAY_PALETTES[m].tokens)}}`),
+        ...MOODS.map((m) => `:root[data-mood="${m}"][data-dark]{${declarations(NIGHT_PALETTES[m].tokens)}}`),
     ].join('\n');
 }
 
 export function paletteFor(mood: Mood, dark: boolean): Palette {
-    return (dark && DARK_VARIANTS[mood]) || PALETTES[mood];
+    return (dark ? NIGHT_PALETTES : DAY_PALETTES)[mood];
 }
