@@ -4,19 +4,17 @@ import { eyebrow, u } from './units';
 
 const COAT_VERDICTS: readonly VerdictKind[] = ['coat-on', 'coat-in-bag'];
 
-// "LEAVING NOW" → the serif verdict → one reason line. The accent colour
-// marks any verdict that involves a coat.
+// "TODAY" → the serif verdict. The accent colour marks any verdict that
+// involves a coat; the numbers behind it are the live stats and the cards.
 export default function Verdict({
     heading,
     verdict,
     text,
-    reason,
     compact = false,
 }: {
     heading: string;
     verdict: VerdictKind;
     text: string;
-    reason: string;
     compact?: boolean;
 }) {
     const coat = COAT_VERDICTS.includes(verdict);
@@ -28,7 +26,7 @@ export default function Verdict({
                     margin: 0,
                     fontFamily: 'var(--font-display)',
                     fontWeight: 400,
-                    fontSize: u(compact ? 62 : 92),
+                    fontSize: u(compact ? 62 : 84),
                     lineHeight: 0.95,
                     letterSpacing: u(-1),
                     color: coat ? 'var(--accent-coat)' : 'var(--ink)',
@@ -36,9 +34,6 @@ export default function Verdict({
             >
                 {text}
             </h1>
-            <p className="tn" style={{ margin: `${u(compact ? 2 : 6)} 0 0 0`, fontSize: u(compact ? 16 : 19), lineHeight: 1.4, color: 'var(--ink-sub)' }}>
-                {reason}
-            </p>
         </div>
     );
 }

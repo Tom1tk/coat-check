@@ -1,6 +1,6 @@
 import { COMMUTE, WET } from '../config';
 import { Verdict, WindowSummary, commuteWindows, currentHourSummary, verdictFor } from './coatAdvice';
-import { range12 } from './twelveHour';
+import { hour12, range12 } from './twelveHour';
 import { Forecast, localDate, localStamp, localTime, locationNow, parseLocal } from './forecast';
 import { describeCode } from './weatherCodes';
 
@@ -10,11 +10,11 @@ import { describeCode } from './weatherCodes';
 export type TagKind = 'coat' | 'ok';
 
 export interface PanelCard {
-    label: string; // "Out" | "Back" | "Next 12 h"
+    label: string; // "Out" | "Back" | "Today" | "Tomorrow"
     range: string; // "7:30–9:00am"
     code: number;
     temp: number;
-    feels: number;
+    sub: string; // "feels 6°" for a commute window, "low 6°" for a whole day
     line: string; // "80% · 2.4 mm · gusts 28"
     tag: string; // "Coat on" | "Light layer" | "No coat needed"
     kind: TagKind;
@@ -29,7 +29,7 @@ export interface PanelModel {
     time: string; // "07:42" location-local
     date: string; // "Monday 19 October"
     mood: string; // current condition, e.g. "Overcast"
-    heading: string; // "LEAVING NOW" | "TOMORROW" | "NEXT 12 HOURS"
+    heading: string; // "LEAVING NOW" | "TODAY" | "TOMORROW"
     verdict: Verdict;
     verdictText: string; // "Coat in bag."
     reason: string;
@@ -69,14 +69,15 @@ const toHours = (hhmm: string) => {
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
-function card(w: WindowSummary): PanelCard {
+function card(w: WindowSummary, today: string): PanelCard {
     const [tag, kind] = TAG[verdictFor(null, [w]).verdict];
+    const day = w.label === 'Day';
     return {
-        label: w.label,
-        range: range12(w.start, w.end),
+        label: day ? (w.startsAt.startsWith(today) ? 'Today' : 'Tomorrow') : w.label,
+        range: day ? `${hour12(toHours(w.start))}–${hour12(toHours(w.end))}` : range12(w.start, w.end),
         code: w.dominantCode,
         temp: Math.round(w.maxTemp),
-        feels: Math.round(w.minFeelsLike),
+        sub: day ? `low ${Math.round(w.minTemp)}°` : `feels ${Math.round(w.minFeelsLike)}°`,
         line: `${w.maxProbability}% · ${round1(w.totalPrecipitation)} mm · gusts ${Math.round(w.maxGust)}`,
         tag,
         kind,
@@ -84,8 +85,9 @@ function card(w: WindowSummary): PanelCard {
 }
 
 function headingFor(windows: WindowSummary[], today: string): string {
-    if (windows.length === 0 || windows[0].label === 'Next 12 h') return 'NEXT 12 HOURS';
-    return windows[0].startsAt.startsWith(today) ? 'LEAVING NOW' : 'TOMORROW';
+    if (windows.length === 0) return 'TODAY';
+    if (!windows[0].startsAt.startsWith(today)) return 'TOMORROW';
+    return windows[0].label === 'Day' ? 'TODAY' : 'LEAVING NOW';
 }
 
 const hourIsWet = (f: Forecast, i: number) =>
@@ -138,7 +140,7 @@ export function panelModel(f: Forecast, now: Date): PanelModel {
         verdictText: VERDICT_TEXT[result.verdict],
         reason: result.umbrella ? `${result.reason} · umbrella OK` : result.reason,
         umbrella: result.umbrella,
-        cards: windows.map(card),
+        cards: windows.map((w) => card(w, today)),
         stats: {
             temp: Math.round(f.current.temperature),
             feels: Math.round(f.current.feelsLike),

@@ -5,7 +5,9 @@ import { hour12 } from '@/app/utils/twelveHour';
 import { eyebrow, u } from './units';
 
 const SPAN = STRIP_END_HOUR - STRIP_START_HOUR + 1;
-const HEIGHT = 96;
+const HEIGHT = 110;
+const MIN_HEIGHT = 60; // the strip gives way to two window cards down to this
+const BAR_SCALE = 0.9; // a 100% chance fills this much of the strip
 const WINDOW_TINTS = ['var(--out-win)', 'var(--back-win)'];
 
 const pct = (n: number) => `${((n / SPAN) * 100).toFixed(2)}%`;
@@ -19,12 +21,12 @@ function barColour(probability: number): string {
 // Today's hourly chance of rain, 07–20, with the commute windows shaded.
 export default function RainStrip({ hours, shading }: { hours: RainHour[]; shading: { start: number; end: number }[] }) {
     return (
-        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: u(10) }}>
+        <div style={{ marginTop: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: u(10) }}>
             <div style={{ ...eyebrow, display: 'flex', justifyContent: 'space-between' }}>
                 <span>TODAY · CHANCE OF RAIN</span>
                 {shading.length > 0 && <span style={{ letterSpacing: 0, fontWeight: 400 }}>shaded = your commute</span>}
             </div>
-            <div style={{ position: 'relative', height: u(HEIGHT) }}>
+            <div style={{ position: 'relative', height: u(HEIGHT), minHeight: u(MIN_HEIGHT), flexShrink: 1 }}>
                 {shading.map((w, i) => (
                     <div
                         key={w.start}
@@ -44,7 +46,7 @@ export default function RainStrip({ hours, shading }: { hours: RainHour[]; shadi
                         <div
                             key={h.hour}
                             title={`${hour12(h.hour)} · ${h.probability}%`}
-                            style={{ flex: '1 1 0', height: u(Math.round(h.probability * 0.86) + 4), borderRadius: `${u(4)} ${u(4)} ${u(2)} ${u(2)}`, background: barColour(h.probability) }}
+                            style={{ flex: '1 1 0', height: `calc(${(h.probability * BAR_SCALE).toFixed(1)}% + ${u(4)})`, borderRadius: `${u(4)} ${u(4)} ${u(2)} ${u(2)}`, background: barColour(h.probability) }}
                         />
                     ))}
                 </div>

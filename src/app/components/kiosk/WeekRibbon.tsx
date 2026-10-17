@@ -1,14 +1,16 @@
 'use client';
 import type { Ref } from 'react';
 import WeatherIcon from '../WeatherIcon';
-import type { RibbonDay } from '@/app/utils/weekRibbon';
-import { u } from './units';
+import { Wind } from 'lucide-react';
+import type { CoatKind, RibbonDay } from '@/app/utils/weekRibbon';
+import { RIBBON_HEIGHT, u } from './units';
 
 const RADIUS = 18;
 const GAP = 8;
 const WEEKEND_MARGIN = 10;
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
+const pctColour = (d: RibbonDay) => (d.probability >= 50 ? 'var(--pct-hi)' : 'var(--ink-sub)');
 
 function background(d: RibbonDay, i: number): string {
     if (d.weekend) return 'var(--weekend-tint)';
@@ -31,69 +33,84 @@ function marginLeft(days: RibbonDay[], i: number, gap: number): string {
     return afterWeekend || opensWeekend ? u(WEEKEND_MARGIN) : '0';
 }
 
-// Landscape: the full day column. Portrait: narrow columns, so the date,
-// rain amount and wind drop out and the low sits under the high.
-function Day({ d, portrait }: { d: RibbonDay; portrait: boolean }) {
-    const pct = (
-        <span className="tn" style={{ fontSize: u(portrait ? 15 : 17), fontWeight: 600, whiteSpace: 'nowrap', color: d.probability >= 50 ? 'var(--pct-hi)' : 'var(--ink-sub)' }}>
-            {d.probability}%
-            {!portrait && (
-                <>
-                    {' '}
-                    <span style={{ fontSize: u(14), fontWeight: 400, color: 'var(--ink-muted)' }}>{round1(d.precipitation)} mm</span>
-                </>
-            )}
+const BADGE: Readonly<Record<CoatKind, { bg: string; fg: string }>> = {
+    coat: { bg: 'var(--coat-bg)', fg: 'var(--coat-fg)' },
+    cold: { bg: 'var(--coat-bg)', fg: 'var(--coat-fg)' },
+    layer: { bg: 'var(--ok-bg)', fg: 'var(--ok-fg)' },
+    none: { bg: 'transparent', fg: 'transparent' },
+};
+
+function Badge({ d, size }: { d: RibbonDay; size: number }) {
+    if (!d.coatLabel) return null;
+    const badge = BADGE[d.coat];
+    return (
+        <span style={{ alignSelf: 'flex-start', fontSize: u(size), fontWeight: 600, letterSpacing: u(1), padding: `${u(3)} ${u(9)}`, borderRadius: 999, background: badge.bg, color: badge.fg, whiteSpace: 'nowrap' }}>
+            {d.coatLabel}
         </span>
     );
-    const coat = (
-        <span
-            style={{
-                marginTop: 'auto',
-                fontSize: u(portrait ? 11 : 12),
-                fontWeight: 600,
-                letterSpacing: u(1),
-                whiteSpace: 'nowrap',
-                color: d.coatLabel ? 'var(--accent-coat)' : 'transparent',
-            }}
-        >
-            {d.coatLabel || '—'}
-        </span>
-    );
-    if (portrait) {
-        return (
-            <>
-                <span style={{ fontSize: u(17), fontWeight: 600 }}>{d.day}</span>
-                <WeatherIcon code={d.code} size={u(28)} strokeWidth={1.5} />
-                <span className="tn" style={{ fontSize: u(26), fontWeight: 500, lineHeight: 1 }}>{Math.round(d.max)}°</span>
-                <span className="tn" style={{ fontSize: u(18), fontWeight: 300, lineHeight: 1, color: 'var(--ink-muted)' }}>{Math.round(d.min)}°</span>
-                {pct}
-                {coat}
-            </>
-        );
-    }
+}
+
+// One day cell: name and date; icon beside the high/low and rain; the wind;
+// the coat badge, always bottom-left under its own day.
+function Day({ d }: { d: RibbonDay }) {
     return (
         <>
-            <span style={{ fontSize: u(18), fontWeight: 600 }}>{d.day}</span>
-            <span style={{ fontSize: u(13), color: 'var(--ink-muted)' }}>{d.sub}</span>
-            <WeatherIcon code={d.code} size={u(40)} strokeWidth={1.5} />
-            <span className="tn" style={{ fontSize: u(30), fontWeight: 500, lineHeight: 1, whiteSpace: 'nowrap' }}>
-                {Math.round(d.max)}°
-                <span style={{ fontSize: u(20), fontWeight: 300, color: 'var(--ink-muted)' }}> {Math.round(d.min)}°</span>
+            <span style={{ display: 'flex', alignItems: 'baseline', gap: u(6), minWidth: 0, whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: u(18), fontWeight: 600 }}>{d.day}</span>
+                <span style={{ fontSize: u(13), color: 'var(--ink-muted)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.sub}</span>
             </span>
-            {pct}
-            <span className="tn" style={{ fontSize: u(14), color: 'var(--ink-sub)', whiteSpace: 'nowrap' }}>
-                {Math.round(d.wind)} · g{Math.round(d.gust)}
+            <span style={{ display: 'flex', alignItems: 'center', gap: u(12), minWidth: 0 }}>
+                <WeatherIcon code={d.code} size={u(40)} strokeWidth={1.5} />
+                <span style={{ display: 'flex', flexDirection: 'column', gap: u(4), minWidth: 0 }}>
+                    <span className="tn" style={{ fontSize: u(30), fontWeight: 500, lineHeight: 1, whiteSpace: 'nowrap' }}>
+                        {Math.round(d.max)}°
+                        <span style={{ fontSize: u(20), fontWeight: 300, color: 'var(--ink-muted)' }}> {Math.round(d.min)}°</span>
+                    </span>
+                    <span className="tn" style={{ fontSize: u(16), fontWeight: 600, whiteSpace: 'nowrap', color: pctColour(d) }}>
+                        {d.probability}%{' '}
+                        <span style={{ fontSize: u(14), fontWeight: 400, color: 'var(--ink-muted)' }}>{round1(d.precipitation)} mm</span>
+                    </span>
+                </span>
             </span>
-            {coat}
+            <span className="tn" style={{ display: 'flex', alignItems: 'center', gap: u(6), minWidth: 0, fontSize: u(14), color: 'var(--ink-sub)', whiteSpace: 'nowrap' }}>
+                <Wind aria-hidden style={{ width: u(15), height: u(15), flexShrink: 0, color: 'var(--ink-muted)' }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {Math.round(d.wind)} mph · gusts {Math.round(d.gust)}
+                </span>
+            </span>
+            <Badge d={d} size={12} />
         </>
     );
 }
 
-// Landscape: along the bottom, right of the panel. Portrait: the bottom of
-// the stack, which places it.
+// Portrait: seven narrow columns, so the same facts stack — the date and
+// rain amount drop out, the low sits beside the high, wind is "14 g26".
+function PortraitDay({ d }: { d: RibbonDay }) {
+    return (
+        <>
+            <span style={{ fontSize: u(18), fontWeight: 600, whiteSpace: 'nowrap' }}>{d.day}</span>
+            <WeatherIcon code={d.code} size={u(32)} strokeWidth={1.5} />
+            <span className="tn" style={{ fontSize: u(26), fontWeight: 500, lineHeight: 1, whiteSpace: 'nowrap' }}>
+                {Math.round(d.max)}°
+                <span style={{ fontSize: u(18), fontWeight: 300, color: 'var(--ink-muted)' }}> {Math.round(d.min)}°</span>
+            </span>
+            <span className="tn" style={{ fontSize: u(15), fontWeight: 600, whiteSpace: 'nowrap', color: pctColour(d) }}>{d.probability}%</span>
+            <span className="tn" style={{ display: 'flex', alignItems: 'center', gap: u(4), minWidth: 0, fontSize: u(13), color: 'var(--ink-sub)', whiteSpace: 'nowrap' }}>
+                <Wind aria-hidden style={{ width: u(14), height: u(14), flexShrink: 0, color: 'var(--ink-muted)' }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {Math.round(d.wind)} g{Math.round(d.gust)}
+                </span>
+            </span>
+            <Badge d={d} size={11} />
+        </>
+    );
+}
+
+// Landscape: full width along the bottom, under the panel. Portrait: the
+// bottom of the stack, which places it.
 const PLACEMENT = {
-    landscape: { position: 'absolute', left: u(632), right: u(32), bottom: u(32), height: u(280), padding: u(18) },
-    portrait: { position: 'relative', padding: u(8) },
+    landscape: { position: 'absolute', left: u(32), right: u(32), bottom: u(32), height: u(RIBBON_HEIGHT) },
+    portrait: { position: 'relative' },
 } as const;
 
 // Today + 6 days.
@@ -106,6 +123,7 @@ export default function WeekRibbon({ days, portrait = false, ref }: { days: Ribb
             style={{
                 ...PLACEMENT[portrait ? 'portrait' : 'landscape'],
                 boxSizing: 'border-box',
+                padding: u(portrait ? 8 : 14),
                 borderRadius: u(28),
                 display: 'flex',
                 gap: u(portrait ? 4 : GAP),
@@ -119,15 +137,14 @@ export default function WeekRibbon({ days, portrait = false, ref }: { days: Ribb
                         minWidth: 0,
                         display: 'flex',
                         flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: u(portrait ? 5 : 8),
-                        padding: portrait ? `${u(10)} 0` : `${u(14)} ${u(8)}`,
+                        gap: u(portrait ? 7 : 10),
+                        padding: portrait ? `${u(12)} ${u(8)}` : `${u(14)} ${u(16)}`,
                         borderRadius: radius(d),
                         background: background(d, i),
-                        marginLeft: marginLeft(days, i, portrait ? 4 : GAP),
+                        marginLeft: marginLeft(days, i, GAP),
                     }}
                 >
-                    <Day d={d} portrait={portrait} />
+                    {portrait ? <PortraitDay d={d} /> : <Day d={d} />}
                 </div>
             ))}
         </section>

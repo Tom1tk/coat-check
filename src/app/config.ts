@@ -7,7 +7,8 @@ export const COMMUTE = {
     back: { start: '17:00', end: '18:30' },
 } as const;
 
-export const WEEKEND_LOOKAHEAD_HOURS = 12;
+// The daytime a weekend day (no commute) is judged over.
+export const DAYTIME = { start: '07:00', end: '19:00' } as const;
 
 // A window is wet at or above either threshold (or with a wet weather code).
 export const WET = { mm: 0.2, probability: 50 } as const;

@@ -11,7 +11,8 @@ const TONES: Readonly<Record<ChipTone, { bg: string; dot: string }>> = {
     starting: { bg: 'var(--card)', dot: 'var(--ink-muted)' },
 };
 
-function Pill({ bg, dot, children }: { bg: string; dot: string; children: React.ReactNode }) {
+// A dot and its text; on a pill unless `bg` is omitted (the plain status line).
+function Item({ bg, dot, children }: { bg?: string; dot: string; children: React.ReactNode }) {
     return (
         <span
             className="tn"
@@ -19,32 +20,39 @@ function Pill({ bg, dot, children }: { bg: string; dot: string; children: React.
                 display: 'flex',
                 alignItems: 'center',
                 gap: u(8),
+                minWidth: 0,
                 fontSize: u(14),
                 color: 'var(--ink-sub)',
-                padding: `${u(6)} ${u(12)}`,
+                padding: bg ? `${u(6)} ${u(12)}` : 0,
                 borderRadius: 999,
-                background: bg,
+                background: bg ?? 'none',
                 whiteSpace: 'nowrap',
             }}
         >
-            <span aria-hidden style={{ width: u(8), height: u(8), borderRadius: 999, background: dot }} />
-            {children}
+            <span aria-hidden style={{ width: u(8), height: u(8), flexShrink: 0, borderRadius: 999, background: dot }} />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{children}</span>
         </span>
     );
 }
 
-// "Updated 07:40 · Overcast" — data freshness, plus the current condition.
-export default function StatusChip({ status, mood }: { status: ChipStatus; mood?: string }) {
+// "Updated 7:40am · Overcast" — data freshness, plus the current condition.
+// Pills stacked on the right (the loading screen), or `plain`: one row of
+// dots and text, the status line at the foot of the panel.
+export default function StatusChip({ status, mood, plain = false }: { status: ChipStatus; mood?: string; plain?: boolean }) {
     const tone = TONES[status.tone];
     return (
-        <div role="status" aria-live="polite" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: u(6) }}>
-            <Pill bg={tone.bg} dot={tone.dot}>
+        <div
+            role="status"
+            aria-live="polite"
+            style={plain ? { display: 'flex', alignItems: 'center', gap: u(16), minWidth: 0 } : { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: u(6) }}
+        >
+            <Item bg={plain ? undefined : tone.bg} dot={tone.dot}>
                 {mood ? `${status.text} · ${mood}` : status.text}
-            </Pill>
+            </Item>
             {status.radarDown && (
-                <Pill bg="var(--card)" dot="var(--ink-muted)">
+                <Item bg={plain ? undefined : 'var(--card)'} dot="var(--ink-muted)">
                     Radar unavailable
-                </Pill>
+                </Item>
             )}
         </div>
     );

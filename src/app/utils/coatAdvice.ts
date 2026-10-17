@@ -2,15 +2,15 @@ import { clock12 } from './twelveHour';
 import {
     COLD_FEELS_LIKE_C,
     COMMUTE,
+    DAYTIME,
     LAYER_FEELS_LIKE_C,
     UMBRELLA_MAX_GUST_MPH,
-    WEEKEND_LOOKAHEAD_HOURS,
     WET,
 } from '../config';
 import { Forecast, addDays, localDate, locationNow } from './forecast';
 import { describeCode } from './weatherCodes';
 
-export type WindowLabel = 'Now' | 'Out' | 'Back' | 'Next 12 h';
+export type WindowLabel = 'Now' | 'Out' | 'Back' | 'Day';
 
 export interface WindowSummary {
     label: WindowLabel;
@@ -19,6 +19,7 @@ export interface WindowSummary {
     startsAt: string; // "YYYY-MM-DDTHH:MM" location-local
     endsAt: string;
     minFeelsLike: number;
+    minTemp: number;
     maxTemp: number;
     maxProbability: number;
     totalPrecipitation: number;
@@ -82,6 +83,7 @@ export function summariseWindow(
         startsAt: `${dateISO}T${start}`,
         endsAt: `${endMinutes >= 24 * 60 ? addDays(dateISO, 1) : dateISO}T${end}`,
         minFeelsLike: Math.min(...range(f.hourly.feelsLike)),
+        minTemp: Math.min(...range(f.hourly.temperature)),
         maxTemp: Math.max(...range(f.hourly.temperature)),
         maxProbability: Math.max(...range(f.hourly.probability)),
         totalPrecipitation,
@@ -100,10 +102,8 @@ export function currentHourSummary(f: Forecast, now: Date): WindowSummary | null
 
 const isWeekend = (local: Date) => local.getUTCDay() === 0 || local.getUTCDay() === 6;
 
-function nextHours(f: Forecast, local: Date): WindowSummary[] {
-    const h = local.getUTCHours();
-    const end = `${pad((h + WEEKEND_LOOKAHEAD_HOURS) % 24)}:00`;
-    const w = summariseWindow(f, localDate(local), `${pad(h)}:00`, end, 'Next 12 h');
+function daytime(f: Forecast, dateISO: string): WindowSummary[] {
+    const w = summariseWindow(f, dateISO, DAYTIME.start, DAYTIME.end, 'Day');
     return w ? [w] : [];
 }
 
@@ -114,17 +114,17 @@ export function commuteDay(f: Forecast, dateISO: string): WindowSummary[] {
     ].filter((w): w is WindowSummary => w !== null);
 }
 
-// Weekday → today's [Out, Back] until Back ends, then the next day's.
-// Sat/Sun — and a Friday evening, whose next day has no commute — → [Next 12 h].
+// The day's windows: [Out, Back] on a weekday, its daytime [Day] on Sat/Sun.
+const dayWindows = (f: Forecast, local: Date) => (isWeekend(local) ? daytime : commuteDay)(f, localDate(local));
+
+// Today's windows until the last one ends (Back on a weekday, the daytime at
+// a weekend), then the next day's.
 export function commuteWindows(f: Forecast, now: Date): WindowSummary[] {
     const local = locationNow(f.utcOffsetSeconds, now.getTime());
-    if (isWeekend(local)) return nextHours(f, local);
-
     const minutes = local.getUTCHours() * 60 + local.getUTCMinutes();
-    if (minutes < toMinutes(COMMUTE.back.end)) return commuteDay(f, localDate(local));
-
-    const tomorrow = new Date(local.getTime() + 24 * 3600_000);
-    return isWeekend(tomorrow) ? nextHours(f, local) : commuteDay(f, localDate(tomorrow));
+    const lastEnd = isWeekend(local) ? DAYTIME.end : COMMUTE.back.end;
+    if (minutes < toMinutes(lastEnd)) return dayWindows(f, local);
+    return dayWindows(f, new Date(local.getTime() + 24 * 3600_000));
 }
 
 // --- Verdicts --------------------------------------------------------------

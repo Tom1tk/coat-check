@@ -41,11 +41,22 @@ describe('panelModel', () => {
         expect(panelModel(wetBack, at(`${MONDAY}T19:10`)).heading).toBe('TOMORROW');
     });
 
-    it('weekend: one Next 12 h card and no commute shading', () => {
+    it('weekday cards give the coldest feels-like', () => {
+        expect(panelModel(wetBack, at(`${MONDAY}T07:42`)).cards[0].sub).toBe('feels 16°');
+    });
+
+    it('weekend: one whole-day card and no commute shading', () => {
         const m = panelModel(wetBack, at('2026-10-24T10:00'));
-        expect(m.heading).toBe('NEXT 12 HOURS');
-        expect(m.cards.map((c) => c.label)).toEqual(['Next 12 h']);
+        expect(m.heading).toBe('TODAY');
+        expect(m.cards.map((c) => [c.label, c.range])).toEqual([['Today', '7am–7pm']]);
+        expect(m.cards[0].sub).toMatch(/^low -?\d+°$/);
         expect(m.shading).toEqual([]);
+    });
+
+    it('weekend evening looks at tomorrow\'s day', () => {
+        const m = panelModel(wetBack, at('2026-10-24T19:30'));
+        expect(m.heading).toBe('TOMORROW');
+        expect(m.cards.map((c) => c.label)).toEqual(['Tomorrow']);
     });
 
     it('live fixture (Saturday 13:30 BST) derives without throwing', () => {

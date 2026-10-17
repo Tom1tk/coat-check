@@ -9,3 +9,6 @@ export const eyebrow = {
     letterSpacing: u(2),
     color: 'var(--ink-muted)',
 } as const;
+
+// The landscape week ribbon's height; the panel ends above it.
+export const RIBBON_HEIGHT = 214;

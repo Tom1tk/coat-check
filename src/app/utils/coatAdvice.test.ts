@@ -52,13 +52,13 @@ describe('summariseWindow', () => {
     });
 
     it('wraps past midnight when the end is before the start', () => {
-        const w = summariseWindow(f, MONDAY, '20:00', '02:00', 'Next 12 h')!;
+        const w = summariseWindow(f, MONDAY, '20:00', '02:00', 'Day')!;
         expect(w.endsAt).toBe('2026-10-20T02:00');
     });
 
     it('returns null, not a throw, when the window runs past the forecast', () => {
         const oneDay = buildForecast(MONDAY, { days: 1 });
-        expect(summariseWindow(oneDay, MONDAY, '20:00', '02:00', 'Next 12 h')).toBeNull();
+        expect(summariseWindow(oneDay, MONDAY, '20:00', '02:00', 'Day')).toBeNull();
         expect(summariseWindow(oneDay, '2026-11-01', '07:30', '09:00', 'Out')).toBeNull();
     });
 });
@@ -83,16 +83,26 @@ describe('commuteWindows', () => {
         expect(ws.map((w) => w.startsAt)).toEqual(['2026-10-20T07:30', '2026-10-20T17:00']);
     });
 
-    it('Saturday → Next 12 h from the current hour', () => {
+    it('Saturday → the daytime window, 7am–7pm', () => {
         const ws = commuteWindows(f, at('2026-10-24T10:20'));
-        expect(ws).toHaveLength(1);
-        expect(ws[0].label).toBe('Next 12 h');
-        expect(ws[0].startsAt).toBe('2026-10-24T10:00');
-        expect(ws[0].endsAt).toBe('2026-10-24T22:00');
+        expect(ws.map((w) => [w.label, w.startsAt, w.endsAt])).toEqual([['Day', '2026-10-24T07:00', '2026-10-24T19:00']]);
     });
 
-    it('Friday evening → Next 12 h (no commute tomorrow)', () => {
-        expect(commuteWindows(f, at('2026-10-23T19:00'))[0].label).toBe('Next 12 h');
+    it('Saturday 19:00 rolls to Sunday daytime', () => {
+        expect(commuteWindows(f, at('2026-10-24T19:00'))[0].startsAt).toBe('2026-10-25T07:00');
+    });
+
+    it('Friday evening → Saturday daytime (no commute tomorrow)', () => {
+        const ws = commuteWindows(f, at('2026-10-23T19:00'));
+        expect(ws.map((w) => [w.label, w.startsAt])).toEqual([['Day', '2026-10-24T07:00']]);
+    });
+
+    it('Sunday evening → Monday Out and Back', () => {
+        const ws = commuteWindows(buildForecast(MONDAY, { days: 8 }), at('2026-10-25T19:30'));
+        expect(ws.map((w) => [w.label, w.startsAt])).toEqual([
+            ['Out', '2026-10-26T07:30'],
+            ['Back', '2026-10-26T17:00'],
+        ]);
     });
 
     it('uses the location clock, not UTC', () => {
@@ -106,13 +116,14 @@ describe('commuteWindows', () => {
         expect(commuteWindows(oneDay, at(`${MONDAY}T19:00`))).toEqual([]);
     });
 
-    it('live fixture (Saturday 13:30 BST) → a wet Next 12 h', () => {
+    it('live fixture (Saturday 13:30 BST) → a wet day', () => {
         const live = parseForecast(fixture);
         const ws = commuteWindows(live, new Date('2026-10-17T12:30:00Z'));
         expect(ws).toHaveLength(1);
-        expect(ws[0].startsAt).toBe('2026-10-17T13:00');
-        expect(ws[0].endsAt).toBe('2026-10-18T01:00');
+        expect(ws[0].startsAt).toBe('2026-10-17T07:00');
+        expect(ws[0].endsAt).toBe('2026-10-17T19:00');
         expect(ws[0].wet).toBe(true); // 1.3 mm at 15:00
+        expect(ws[0].minTemp).toBeLessThanOrEqual(ws[0].maxTemp);
     });
 });
 
@@ -135,6 +146,7 @@ function win(overrides: Partial<WindowSummary> = {}): WindowSummary {
         startsAt: `${MONDAY}T07:30`,
         endsAt: `${MONDAY}T09:00`,
         minFeelsLike: 18,
+        minTemp: 18,
         maxTemp: 18,
         maxProbability: 0,
         totalPrecipitation: 0,

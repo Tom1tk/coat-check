@@ -117,21 +117,21 @@ export default function Home() {
               ref={setPanel}
               model={view.model}
               place={location.name}
-              chip={<StatusChip status={status} mood={view.model.mood} />}
+              chip={<StatusChip status={status} mood={view.model.mood} plain />}
               onOpenSettings={() => setSettingsOpen(true)}
               portrait={portrait}
             />
             {portrait ? (
               <div ref={setBottom} style={{ position: 'absolute', left: u(20), right: u(20), bottom: u(20), display: 'flex', flexDirection: 'column', gap: u(12) }}>
                 <NowcastCard slots={view.slots} summary={view.summary} portrait>
-                  <div ref={setLegend} />
+                  <div ref={setLegend} style={{ display: 'contents' }} />
                 </NowcastCard>
                 <WeekRibbon days={view.days} portrait />
               </div>
             ) : (
               <>
                 <NowcastCard slots={view.slots} summary={view.summary}>
-                  <div ref={setLegend} />
+                  <div ref={setLegend} style={{ display: 'contents' }} />
                 </NowcastCard>
                 <WeekRibbon ref={setBottom} days={view.days} />
               </>

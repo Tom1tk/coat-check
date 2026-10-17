@@ -1,80 +1,56 @@
 'use client';
-import type { ReactNode } from 'react';
 import { Settings } from 'lucide-react';
 import { twelveHour } from '@/app/utils/twelveHour';
 import { u } from './units';
 
-// Large clock, the date and place beneath it (tap the place for settings), and the status chip on the
-// right. Portrait is shorter: a smaller clock with the chip beside it, and the
-// date line on its own row beneath both.
+// Large bold clock, the date beneath it, and the place on its own line (tap
+// it for settings), so a long place name ellipsizes without pushing the date.
+// Portrait draws the same stack smaller.
 export default function Clock({
     time,
     date,
     place,
-    chip,
     onOpenSettings,
     portrait = false,
 }: {
     time: string;
     date: string;
     place: string;
-    chip: ReactNode;
     onOpenSettings?: () => void;
     portrait?: boolean;
 }) {
     const clock = twelveHour(time);
-    const period = (size: number) => (
-        <span style={{ fontSize: u(size), letterSpacing: 0, marginLeft: u(4), color: 'var(--ink-sub)' }}>{clock.period}</span>
-    );
-    const dateLine = (
-        <span style={{ display: 'flex', alignItems: 'center', gap: u(5), minWidth: 0, fontSize: u(portrait ? 15 : 17), color: 'var(--ink-muted)', whiteSpace: 'nowrap' }}>
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{date} ·</span>
+    const line = u(portrait ? 16 : 18);
+    return (
+        <header style={{ display: 'flex', flexDirection: 'column', gap: u(portrait ? 4 : 6), minWidth: 0 }}>
+            <time className="tn" style={{ fontSize: u(portrait ? 54 : 72), fontWeight: 600, lineHeight: 1, letterSpacing: u(-2) }}>
+                {clock.time}
+                <span style={{ fontSize: u(portrait ? 20 : 26), fontWeight: 500, letterSpacing: 0, marginLeft: u(4), color: 'var(--ink-sub)' }}>{clock.period}</span>
+            </time>
+            <span style={{ fontSize: line, color: 'var(--ink-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{date}</span>
             <button
                 type="button"
                 onClick={() => onOpenSettings?.()}
                 aria-label={`${place} — change location and settings`}
                 style={{
+                    alignSelf: 'flex-start',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: u(5),
+                    gap: u(6),
+                    maxWidth: '100%',
                     padding: 0,
                     border: 0,
                     background: 'none',
                     font: 'inherit',
-                    color: 'inherit',
+                    fontSize: line,
+                    fontWeight: 500,
+                    color: 'var(--ink-sub)',
                     cursor: 'pointer',
-                    flexShrink: 0,
                 }}
             >
-                {place}
-                <Settings aria-hidden style={{ width: u(portrait ? 15 : 17), height: u(portrait ? 15 : 17), color: 'var(--ink-sub)' }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{place}</span>
+                <Settings aria-hidden style={{ width: line, height: line, flexShrink: 0 }} />
             </button>
-        </span>
-    );
-    if (portrait) {
-        return (
-            <header style={{ display: 'flex', flexDirection: 'column', gap: u(4) }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: u(12) }}>
-                    <time className="tn" style={{ fontSize: u(46), fontWeight: 300, lineHeight: 1, letterSpacing: u(-1.5) }}>
-                        {clock.time}
-                        {period(17)}
-                    </time>
-                    {chip}
-                </div>
-                {dateLine}
-            </header>
-        );
-    }
-    return (
-        <header style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: u(12) }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: u(2), minWidth: 0 }}>
-                <time className="tn" style={{ fontSize: u(64), fontWeight: 300, lineHeight: 1, letterSpacing: u(-2) }}>
-                    {clock.time}
-                    {period(22)}
-                </time>
-                {dateLine}
-            </div>
-            {chip}
         </header>
     );
 }

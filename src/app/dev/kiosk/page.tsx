@@ -68,7 +68,7 @@ function DevKiosk() {
                 model={model}
                 place="Cambridge"
                 onOpenSettings={() => setSettings(true)}
-                chip={<StatusChip status={{ tone: 'fresh', text: `Updated ${clock12(model.time)}`, radarDown: false }} mood={model.mood} />}
+                chip={<StatusChip status={{ tone: 'fresh', text: `Updated ${clock12(model.time)}`, radarDown: false }} mood={model.mood} plain />}
                 portrait={portrait}
             />
             {portrait ? (
