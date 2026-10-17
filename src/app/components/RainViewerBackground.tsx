@@ -445,6 +445,27 @@ function MapWatchdog({
     };
   }, [map, onRemount]);
 
+  // A tile that fails to load (offline, rate-limited) is routine: the frame
+  // just shows less rain. Without a listener MapLibre console.errors every
+  // one, so warn once per source and keep console.error for real faults.
+  useEffect(() => {
+    if (!map) return;
+    const warned = new Set<string>();
+    const onError = (e: { error?: Error; sourceId?: string; tile?: unknown }) => {
+      if (e.sourceId && e.tile) {
+        if (warned.has(e.sourceId)) return;
+        warned.add(e.sourceId);
+        console.warn(`[Map] tiles failed to load for ${e.sourceId}:`, e.error?.message);
+        return;
+      }
+      console.error('[Map]', e.error ?? e);
+    };
+    map.on('error', onError);
+    return () => {
+      map.off('error', onError);
+    };
+  }, [map]);
+
   return null;
 }
 
