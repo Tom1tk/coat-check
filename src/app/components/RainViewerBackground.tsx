@@ -146,7 +146,8 @@ function useRadarLoop(map: MapInstance | null, isLoaded: boolean, frames: RadarF
   }, [map, isLoaded]);
 
   // The vendored map can report the swap loaded before `setStyle` lands, so
-  // layers re-added then are diffed away; put back any that went missing.
+  // layers re-added then are diffed away; put back any that went missing —
+  // on `idle` too, since a swap's style events all fire before it settles.
   useEffect(() => {
     if (!map) return;
     const heal = () => {
@@ -159,8 +160,10 @@ function useRadarLoop(map: MapInstance | null, isLoaded: boolean, frames: RadarF
       }
     };
     map.on("styledata", heal);
+    map.on("idle", heal);
     return () => {
       map.off("styledata", heal);
+      map.off("idle", heal);
     };
   }, [map]);
 
@@ -375,7 +378,10 @@ function MoodTint({ colour }: { colour: string }) {
   const { map } = useMap();
 
   // Checked on every style change rather than on the map's `isLoaded`, which
-  // can flip back before a swap's `setStyle` lands (see useRadarLoop).
+  // can flip back before a swap's `setStyle` lands (see useRadarLoop). Style
+  // changes arrive while tiles are still loading (`isStyleLoaded` false), so
+  // `idle` catches the moment it settles; without it the wash waited for the
+  // radar's next layer.
   useEffect(() => {
     if (!map) return;
     const ensure = () => {
@@ -384,6 +390,8 @@ function MoodTint({ colour }: { colour: string }) {
         map.setPaintProperty(TINT_LAYER, "background-color", colour);
         return;
       }
+      // A new layer transitions from the paint default (black), so it goes
+      // in at full colour and only later changes get the minute-long fade.
       const radar = map.getStyle().layers.find((l) => l.id.startsWith("rain-"));
       map.addLayer(
         {
@@ -391,16 +399,22 @@ function MoodTint({ colour }: { colour: string }) {
           type: "background",
           paint: {
             "background-color": colour,
-            "background-color-transition": { duration: TINT_FADE_MS, delay: 0 },
+            "background-color-transition": { duration: 0, delay: 0 },
           },
         },
         radar?.id
       );
+      map.once("render", () => {
+        if (!map.getLayer(TINT_LAYER)) return;
+        map.setPaintProperty(TINT_LAYER, "background-color-transition", { duration: TINT_FADE_MS, delay: 0 });
+      });
     };
     ensure();
     map.on("styledata", ensure);
+    map.on("idle", ensure);
     return () => {
       map.off("styledata", ensure);
+      map.off("idle", ensure);
     };
   }, [map, colour]);
 
