@@ -32,7 +32,7 @@ import { paletteFor } from './utils/moodPalettes';
 // The kiosk: map behind, panel left, nowcast top-right, week along the
 // bottom. On a portrait screen (layout B) the panel spans the top and the
 // nowcast bar and week stack along the bottom, with the map between. Runs unattended — data refresh is the scheduler's job, and settings
-// stay off-screen unless opened by `?settings` or a hold on the place name.
+// stay off-screen unless opened by `?settings` or a tap on the place name.
 export default function Home() {
   const params = useKioskParams();
   const stored = useLocation();
@@ -118,7 +118,7 @@ export default function Home() {
               model={view.model}
               place={location.name}
               chip={<StatusChip status={status} mood={view.model.mood} />}
-              onPlaceHold={() => setSettingsOpen(true)}
+              onOpenSettings={() => setSettingsOpen(true)}
               portrait={portrait}
             />
             {portrait ? (

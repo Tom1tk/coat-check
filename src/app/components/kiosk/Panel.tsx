@@ -21,14 +21,14 @@ export default function Panel({
     model,
     place,
     chip,
-    onPlaceHold,
+    onOpenSettings,
     portrait = false,
     ref,
 }: {
     model: PanelModel;
     place: string;
     chip: ReactNode;
-    onPlaceHold?: () => void;
+    onOpenSettings?: () => void;
     portrait?: boolean;
     ref?: Ref<HTMLElement>;
 }) {
@@ -47,7 +47,7 @@ export default function Panel({
                 overflow: 'hidden',
             }}
         >
-            <Clock time={model.time} date={model.date} place={place} chip={chip} onPlaceHold={onPlaceHold} portrait={portrait} />
+            <Clock time={model.time} date={model.date} place={place} chip={chip} onOpenSettings={onOpenSettings} portrait={portrait} />
             <Verdict heading={model.heading} verdict={model.verdict} text={model.verdictText} reason={model.reason} compact={portrait} />
             {model.cards.length > 0 && (
                 <div style={{ display: 'grid', gridTemplateColumns: `repeat(${model.cards.length}, minmax(0, 1fr))`, gap: u(portrait ? 10 : 14) }}>

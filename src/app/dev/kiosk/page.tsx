@@ -25,7 +25,7 @@ import SettingsSheet from '@/app/components/kiosk/SettingsSheet';
 // `?at=YYYY-MM-DDTHH:MM` (location-local) fixes the clock; `?mood=<mood>`
 // previews a weather mood (otherwise the fixture's own at that time) and
 // `?dark` its night palette (otherwise the sun decides); `?map` adds the live base map (network) to check the padding; `?settings`
-// opens the settings sheet (also: hold the place name for 3 s).
+// opens the settings sheet (also: tap the place name).
 const FORECAST = parseForecast(fixture);
 const DEFAULT_AT = FORECAST.current.time;
 const CAMBRIDGE = { name: 'Cambridge', latitude: 52.2053, longitude: 0.1218 };
@@ -67,7 +67,7 @@ function DevKiosk() {
                 ref={setPanel}
                 model={model}
                 place="Cambridge"
-                onPlaceHold={() => setSettings(true)}
+                onOpenSettings={() => setSettings(true)}
                 chip={<StatusChip status={{ tone: 'fresh', text: `Updated ${clock12(model.time)}`, radarDown: false }} mood={model.mood} />}
                 portrait={portrait}
             />

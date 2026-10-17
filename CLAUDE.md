@@ -46,7 +46,7 @@ Deployed on Vercel at coat-check.vercel.app.
 
 Params pin config and win over localStorage: `lat`, `lon` (+ optional
 `name`), `zoom` (8/7/6/5), `radar=still`. `?settings` opens the settings
-sheet; otherwise it opens on a 3 s hold on the place name. Invalid params are
+sheet; otherwise it opens on a tap of the place name. Invalid params are
 ignored with a `console.warn`.
 
 ## Conventions
