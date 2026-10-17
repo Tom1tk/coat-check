@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { MAX_AGE_MS, SourceId, isDue } from '../utils/freshness';
 
 const TICK_MS = 30_000;
@@ -55,32 +55,35 @@ function snapshot(books: Record<SourceId, Bookkeeping>, specs: Record<SourceId, 
 // backoff after failures. Nothing here depends on wall-clock hour boundaries.
 export function useScheduler(specs: Record<SourceId, SourceSpec>): SchedulerState {
     const specsRef = useRef(specs);
-    specsRef.current = specs;
+    useLayoutEffect(() => {
+        specsRef.current = specs;
+    });
 
-    const booksRef = useRef<Record<SourceId, Bookkeeping> | null>(null);
-    if (booksRef.current === null) {
-        booksRef.current = Object.fromEntries(
-            SOURCE_IDS.map((id) => [id, freshBookkeeping(specs[id].key)])
-        ) as Record<SourceId, Bookkeeping>;
-    }
+    const [initialBooks] = useState(
+        () =>
+            Object.fromEntries(
+                SOURCE_IDS.map((id) => [id, freshBookkeeping(specs[id].key)])
+            ) as Record<SourceId, Bookkeeping>
+    );
+    const booksRef = useRef(initialBooks);
 
     const [state, setState] = useState<SchedulerState>(() => ({
         now: Date.now(),
         online: true,
-        sources: snapshot(booksRef.current!, specs),
+        sources: snapshot(initialBooks, specs),
     }));
 
     const publish = useCallback(() => {
         setState({
             now: Date.now(),
             online: typeof navigator === 'undefined' ? true : navigator.onLine,
-            sources: snapshot(booksRef.current!, specsRef.current),
+            sources: snapshot(booksRef.current, specsRef.current),
         });
     }, []);
 
     const run = useCallback(
         async (id: SourceId) => {
-            const book = booksRef.current![id];
+            const book = booksRef.current[id];
             const spec = specsRef.current[id];
             const key = book.key;
             book.inFlightKey = key;
@@ -105,12 +108,12 @@ export function useScheduler(specs: Record<SourceId, SourceSpec>): SchedulerStat
     const tick = useCallback(() => {
         const now = Date.now();
         for (const id of SOURCE_IDS) {
-            const book = booksRef.current![id];
+            const book = booksRef.current[id];
             const spec = specsRef.current[id];
             if (book.key !== spec.key) {
-                booksRef.current![id] = freshBookkeeping(spec.key);
+                booksRef.current[id] = freshBookkeeping(spec.key);
             }
-            const current = booksRef.current![id];
+            const current = booksRef.current[id];
             if (current.inFlightKey !== null && current.inFlightKey === current.key) continue;
             const lastSuccess = spec.lastSuccess !== undefined ? spec.lastSuccess : current.lastSuccess;
             if (isDue(now, lastSuccess, current.lastAttempt, current.failures, MAX_AGE_MS[id])) {

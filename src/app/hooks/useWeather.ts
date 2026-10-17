@@ -139,6 +139,7 @@ export function useWeather(location: Location, nowMs: number) {
     // Show the cached forecast for this location immediately (in an effect, not
     // a state initializer, so server and client render the same first frame).
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage isn't readable during SSR
         setPayload(readCache(location));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [key]);
