@@ -1,4 +1,11 @@
-import { COMMUTE, WEEKEND_LOOKAHEAD_HOURS, WET } from '../config';
+import {
+    COLD_FEELS_LIKE_C,
+    COMMUTE,
+    LAYER_FEELS_LIKE_C,
+    UMBRELLA_MAX_GUST_MPH,
+    WEEKEND_LOOKAHEAD_HOURS,
+    WET,
+} from '../config';
 import { Forecast, addDays, localDate, locationNow } from './forecast';
 import { describeCode } from './weatherCodes';
 
@@ -119,6 +126,76 @@ export function commuteWindows(f: Forecast, now: Date): WindowSummary[] {
     return isWeekend(tomorrow) ? nextHours(f, local) : commuteDay(f, localDate(tomorrow));
 }
 
+// --- Verdicts --------------------------------------------------------------
+
+export type Verdict = 'coat-on' | 'coat-in-bag' | 'light-layer' | 'no-coat';
+
+export interface VerdictResult {
+    verdict: Verdict;
+    reason: string;
+    umbrella: boolean;
+}
+
+const isCold = (w: WindowSummary) => w.minFeelsLike < COLD_FEELS_LIKE_C;
+const needsCoat = (w: WindowSummary) => w.wet || isCold(w);
+
+function wetWord(w: WindowSummary): string {
+    const condition = describeCode(w.dominantCode);
+    return condition.wet ? condition.label.toLowerCase() : 'rain';
+}
+
+// One short line, e.g. "Back 17:00 · 70% showers · feels 6°".
+function reasonFor(w: WindowSummary): string {
+    const when = w.label === 'Now' ? 'Now' : `${w.label} ${w.start}`;
+    const sky = w.wet ? `${w.maxProbability}% ${wetWord(w)}` : 'dry';
+    return `${when} · ${sky} · feels ${Math.round(w.minFeelsLike)}°`;
+}
+
+const coldest = (ws: WindowSummary[]) =>
+    ws.reduce((a, b) => (b.minFeelsLike < a.minFeelsLike ? b : a));
+
+// `now` is the current hour (null for a day that hasn't started, e.g.
+// tomorrow's card). A window that starts within the current hour counts as
+// "now"; windows that have ended are ignored. Rules, in order:
+// coat-on (wet/cold now) → coat-in-bag (wet/cold later) → light-layer
+// (coolest feels-like < LAYER) → no-coat.
+export function verdictFor(now: WindowSummary | null, windows: WindowSummary[]): VerdictResult {
+    const open = now ? windows.filter((w) => w.endsAt > now.startsAt) : windows;
+    const startedNow = (w: WindowSummary) => (now ? w.startsAt < now.endsAt : w === open[0]);
+    const current = [...(now ? [now] : []), ...open.filter(startedNow)];
+    const later = open.filter((w) => !startedNow(w));
+    const relevant = [...current, ...later];
+
+    if (relevant.length === 0) {
+        return { verdict: 'no-coat', reason: 'No forecast available', umbrella: false };
+    }
+
+    const wetOrColdNow = current.find(needsCoat);
+    if (wetOrColdNow) {
+        return {
+            verdict: 'coat-on',
+            reason: reasonFor(wetOrColdNow),
+            umbrella: wetOrColdNow.wet && wetOrColdNow.maxGust < UMBRELLA_MAX_GUST_MPH,
+        };
+    }
+
+    const wetOrColdLater = later.find(needsCoat);
+    if (wetOrColdLater) {
+        return {
+            verdict: 'coat-in-bag',
+            reason: reasonFor(wetOrColdLater),
+            umbrella: wetOrColdLater.wet && wetOrColdLater.maxGust < UMBRELLA_MAX_GUST_MPH,
+        };
+    }
+
+    const cool = coldest(relevant);
+    return {
+        verdict: cool.minFeelsLike < LAYER_FEELS_LIKE_C ? 'light-layer' : 'no-coat',
+        reason: reasonFor(cool),
+        umbrella: false,
+    };
+}
+
 // --- Legacy adapter (removed by plan 016 with the old cards) ---------------
 
 export const COAT_ADVICE = {
@@ -128,6 +205,17 @@ export const COAT_ADVICE = {
 } as const;
 
 export type CoatAdvice = (typeof COAT_ADVICE)[keyof typeof COAT_ADVICE];
+
+const ADVICE: Readonly<Record<Verdict, CoatAdvice>> = {
+    'coat-on': COAT_ADVICE.NEEDED,
+    'coat-in-bag': COAT_ADVICE.NEEDED,
+    'light-layer': COAT_ADVICE.RECOMMENDED,
+    'no-coat': COAT_ADVICE.NOT_NEEDED,
+};
+
+export function adviceFor(verdict: Verdict): CoatAdvice {
+    return ADVICE[verdict];
+}
 
 export interface WeatherPeriod {
     temp: number;

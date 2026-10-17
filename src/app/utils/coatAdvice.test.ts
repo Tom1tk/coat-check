@@ -2,8 +2,17 @@ import { describe, it, expect } from 'vitest';
 import fixture from './__fixtures__/forecast-cambridge.json';
 import { buildForecast } from './__fixtures__/buildForecast';
 import { parseForecast } from './forecast';
-import { commuteWindows, currentHourSummary, summariseWindow } from './coatAdvice';
-import { COMMUTE, WET } from '../config';
+import {
+    COAT_ADVICE,
+    WindowSummary,
+    adviceFor,
+    commuteWindows,
+    currentHourSummary,
+    isWet,
+    summariseWindow,
+    verdictFor,
+} from './coatAdvice';
+import { COLD_FEELS_LIKE_C, COMMUTE, LAYER_FEELS_LIKE_C, UMBRELLA_MAX_GUST_MPH, WET } from '../config';
 
 // 2026-10-19 is a Monday; offset 0 so instants read as local time.
 const MONDAY = '2026-10-19';
@@ -113,5 +122,120 @@ describe('currentHourSummary', () => {
         const now = currentHourSummary(f, at(`${MONDAY}T14:59`))!;
         expect(now.label).toBe('Now');
         expect(now.minFeelsLike).toBe(3);
+    });
+});
+
+// --- verdictFor ------------------------------------------------------------
+
+function win(overrides: Partial<WindowSummary> = {}): WindowSummary {
+    const base = {
+        label: 'Out' as const,
+        start: '07:30',
+        end: '09:00',
+        startsAt: `${MONDAY}T07:30`,
+        endsAt: `${MONDAY}T09:00`,
+        minFeelsLike: 18,
+        maxTemp: 18,
+        maxProbability: 0,
+        totalPrecipitation: 0,
+        maxGust: 10,
+        dominantCode: 1,
+        ...overrides,
+    };
+    return { ...base, wet: overrides.wet ?? isWet(base) };
+}
+
+const back = (o: Partial<WindowSummary> = {}) =>
+    win({ label: 'Back', start: '17:00', end: '18:30', startsAt: `${MONDAY}T17:00`, endsAt: `${MONDAY}T18:30`, ...o });
+const nowAt = (hh: string, o: Partial<WindowSummary> = {}) =>
+    win({ label: 'Now', start: `${hh}:00`, startsAt: `${MONDAY}T${hh}:00`, endsAt: `${MONDAY}T${String(Number(hh) + 1).padStart(2, '0')}:00`, ...o });
+
+describe('verdictFor rules', () => {
+    it('coat-on when it is wet now', () => {
+        const r = verdictFor(nowAt('06', { totalPrecipitation: 1, dominantCode: 81, maxProbability: 70 }), [win(), back()]);
+        expect(r.verdict).toBe('coat-on');
+        expect(r.reason).toBe('Now · 70% showers · feels 18°');
+    });
+
+    it('coat-on when the Out window has started and is cold', () => {
+        const r = verdictFor(nowAt('07'), [win({ minFeelsLike: 6 }), back()]);
+        expect(r.verdict).toBe('coat-on');
+        expect(r.reason).toBe('Out 07:30 · dry · feels 6°');
+    });
+
+    it('coat-in-bag when dry now but Back is wet', () => {
+        const r = verdictFor(nowAt('10'), [win(), back({ maxProbability: 70, dominantCode: 80 })]);
+        expect(r.verdict).toBe('coat-in-bag');
+        expect(r.reason).toBe('Back 17:00 · 70% light showers · feels 18°');
+    });
+
+    it('ignores a window that has already ended', () => {
+        const r = verdictFor(nowAt('10'), [win({ totalPrecipitation: 5 }), back()]);
+        expect(r.verdict).toBe('no-coat');
+    });
+
+    it('light-layer when dry and cool', () => {
+        const r = verdictFor(nowAt('06'), [win({ minFeelsLike: 12 }), back()]);
+        expect(r.verdict).toBe('light-layer');
+        expect(r.reason).toBe('Out 07:30 · dry · feels 12°');
+        expect(r.umbrella).toBe(false);
+    });
+
+    it('no-coat when dry and warm', () => {
+        expect(verdictFor(nowAt('06'), [win(), back()]).verdict).toBe('no-coat');
+    });
+
+    it('without a current hour, the first window is "now" (tomorrow card)', () => {
+        expect(verdictFor(null, [win({ minFeelsLike: 5 }), back()]).verdict).toBe('coat-on');
+        expect(verdictFor(null, [win(), back({ minFeelsLike: 5 })]).verdict).toBe('coat-in-bag');
+    });
+
+    it('no-coat with nothing to judge', () => {
+        expect(verdictFor(null, [])).toEqual({ verdict: 'no-coat', reason: 'No forecast available', umbrella: false });
+    });
+});
+
+describe('verdictFor boundaries', () => {
+    const verdictOut = (o: Partial<WindowSummary>) => verdictFor(null, [win(o)]).verdict;
+
+    it.each([
+        [WET.mm - 0.01, 'no-coat'],
+        [WET.mm, 'coat-on'],
+    ])('%f mm → %s', (mm, verdict) => {
+        expect(verdictOut({ totalPrecipitation: mm })).toBe(verdict);
+    });
+
+    it.each([
+        [WET.probability - 1, 'no-coat'],
+        [WET.probability, 'coat-on'],
+    ])('%i%% → %s', (p, verdict) => {
+        expect(verdictOut({ maxProbability: p })).toBe(verdict);
+    });
+
+    it.each([
+        [COLD_FEELS_LIKE_C - 0.1, 'coat-on'],
+        [COLD_FEELS_LIKE_C, 'light-layer'],
+        [LAYER_FEELS_LIKE_C - 0.1, 'light-layer'],
+        [LAYER_FEELS_LIKE_C, 'no-coat'],
+    ])('feels %f° → %s', (feels, verdict) => {
+        expect(verdictOut({ minFeelsLike: feels })).toBe(verdict);
+    });
+
+    it.each([
+        [UMBRELLA_MAX_GUST_MPH - 1, true],
+        [UMBRELLA_MAX_GUST_MPH, false],
+    ])('gust %i mph → umbrella %s', (gust, umbrella) => {
+        expect(verdictFor(null, [win({ totalPrecipitation: 1, maxGust: gust })]).umbrella).toBe(umbrella);
+    });
+});
+
+describe('adviceFor (legacy cards)', () => {
+    it.each([
+        ['coat-on', COAT_ADVICE.NEEDED],
+        ['coat-in-bag', COAT_ADVICE.NEEDED],
+        ['light-layer', COAT_ADVICE.RECOMMENDED],
+        ['no-coat', COAT_ADVICE.NOT_NEEDED],
+    ] as const)('%s → %s', (verdict, advice) => {
+        expect(adviceFor(verdict)).toBe(advice);
     });
 });
