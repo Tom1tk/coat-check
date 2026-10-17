@@ -106,7 +106,7 @@ function nextHours(f: Forecast, local: Date): WindowSummary[] {
     return w ? [w] : [];
 }
 
-function commuteDay(f: Forecast, dateISO: string): WindowSummary[] {
+export function commuteDay(f: Forecast, dateISO: string): WindowSummary[] {
     return [
         summariseWindow(f, dateISO, COMMUTE.out.start, COMMUTE.out.end, 'Out'),
         summariseWindow(f, dateISO, COMMUTE.back.start, COMMUTE.back.end, 'Back'),
@@ -215,19 +215,4 @@ const ADVICE: Readonly<Record<Verdict, CoatAdvice>> = {
 
 export function adviceFor(verdict: Verdict): CoatAdvice {
     return ADVICE[verdict];
-}
-
-export interface WeatherPeriod {
-    temp: number;
-    rain: number;
-    condition: string;
-}
-
-// Old period rule, still used by useWeather until it moves to `verdictFor`.
-export function getCoatAdvice(periods: WeatherPeriod[]): CoatAdvice {
-    if (periods.some((p) => p.rain > 0 || p.temp < 10)) return COAT_ADVICE.NEEDED;
-    if (periods.some((p) => p.temp >= 10 && p.temp <= 15 && p.condition === 'Cloudy')) {
-        return COAT_ADVICE.RECOMMENDED;
-    }
-    return COAT_ADVICE.NOT_NEEDED;
 }

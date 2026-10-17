@@ -27,14 +27,13 @@ export default function Home() {
   // 🕰️ Minute clock: drives sunrise/sunset checks and the hourly roll-over
   const now = useClock();
   const minuteKey = Math.floor(now / 60_000);
-  const hourKey = String(Math.floor(now / 3_600_000));
 
   // ☀️ Sun/Moon Calc - recomputed every minute so the theme flips on time
   const { isDay } = useSunCalc(location.latitude, location.longitude, minuteKey);
   const { setTheme, resolvedTheme } = useTheme();
 
   // Weather + radar data, kept fresh by data age (no reloads, no input)
-  const weather = useWeather(location, hourKey);
+  const weather = useWeather(location, now);
   const { todayWeather, tomorrowWeather, currentHourWeather } = weather;
   const radar = useRadar();
   const scheduler = useScheduler({
