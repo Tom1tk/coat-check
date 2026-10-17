@@ -26,7 +26,7 @@ NOT verified headlessly and are flagged per-plan below for a human pass.
 | 006 | Proxy OWM tiles server-side + rotate exposed key | P2 | M | — | DONE (code); key rotation = operator action |
 | 007 | LocationSearch: abort superseded fetches, timer cleanup | P2 | S | — | DONE (Network-tab race unverified) |
 | 008 | Extract useAutoRefresh/useAutoTheme from page.tsx | P2 | M | 001, 002, 004 | DONE (amended: onWake seam; page 414→244) |
-| 009 | Dependency hygiene (audit fix, types move; config bump blocked) | P3 | S | — | PARTIAL — see below |
+| 009 | Dependency hygiene (audit fix, types move, eslint-config-next 16) | P3 | S | — | DONE (step 1 finished 2026-10-17 — see below) |
 | 010 | Onboarding docs (README setup, .env.example, CLAUDE.md) | P3 | S | soft: 006 | DONE (fresh-clone dry run passed) |
 | 011 | LocationSearch combobox a11y + keyboard navigation | P3 | S | 007 | DONE (keyboard nav unverified) |
 | 012 | RainViewer multi-colour radar overlay, OWM fallback | P2 | M | 004, 006 | DONE (amended: onLoaded decoupled + 8s index timeout; browser-only checks unverified) |
@@ -48,7 +48,7 @@ DevTools request-blocking fallback drill.
 Status values: TODO | IN PROGRESS | DONE | PARTIAL | BLOCKED (with one-line
 reason) | REJECTED (with one-line rationale).
 
-### Plan 009 — PARTIAL
+### Plan 009 — DONE (step 1 finished 2026-10-17)
 
 Steps 2–3 landed: `npm audit fix` cleared all 5 HIGH advisories (10 → 2
 remaining, both a moderate PostCSS advisory nested inside `next` itself,
@@ -60,6 +60,17 @@ config validator — a plugin-version mismatch that needs `eslint.config.mjs`
 migrated off FlatCompat (out of scope). Left pinned at 15.5.5. Reverting the
 bump restored the clean baseline, confirming the STOP was config breakage, not
 an app-code finding. Follow-up: migrate the flat config, then retry the bump.
+
+**Step 1 done 2026-10-17**: `eslint-config-next` is on 16.x and
+`eslint.config.mjs` imports its native flat configs (`core-web-vitals`,
+`typescript`) through `defineConfig`; FlatCompat and `@eslint/eslintrc` are
+gone. The new react-hooks v7 rules flagged three spots in our hooks:
+`useScheduler` now writes its specs ref in a layout effect and seeds its
+bookkeeping from a `useState` initializer instead of reading refs during
+render; `useWeather`'s cache read stays in an effect (localStorage is
+unreadable during SSR) with a scoped disable that says so. The vendored
+`src/components/ui/map.tsx` gets `react-hooks/refs` turned off by a
+file-scoped override rather than edits.
 
 ### Plan 008 — amended during execution
 
@@ -78,11 +89,11 @@ A's side panel + B's week ribbon, with weather moods). Reliability first.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 013 | Kiosk data scheduler (data-age refresh, cache, map self-recovery) | P1 | M | — | TODO |
-| 014 | Typed forecast, commute windows, graded coat verdicts | P1 | M | soft: 013 | TODO |
-| 015 | Radar: 512 px tiles + animated 2-hour loop | P2 | M | 013 | TODO |
-| 016 | Hybrid kiosk layout (panel + ribbon + nowcast) | P2 | L | 013, 014; soft: 015 | TODO |
-| 017 | Weather moods (palette follows the next 3 hours) | P2 | S–M | 014, 016 | TODO |
+| 013 | Kiosk data scheduler (data-age refresh, cache, map self-recovery) | P1 | M | — | DONE (merged 99dc7ba) |
+| 014 | Typed forecast, commute windows, graded coat verdicts | P1 | M | soft: 013 | DONE (merged a956926) |
+| 015 | Radar: 512 px tiles + animated 2-hour loop | P2 | M | 013 | DONE (merged c8a79ba) |
+| 016 | Hybrid kiosk layout (panel + ribbon + nowcast) | P2 | L | 013, 014; soft: 015 | DONE (merged 84a52ea) |
+| 017 | Weather moods (palette follows the current hour) | P2 | S–M | 014, 016 | DONE (merged 83af0de; amended: current hour, not 3) |
 
 - **013 → 015**: 015 hangs the frame refresh on 013's `radarTick`.
 - **013 ↔ 014**: both edit `useWeather.ts`. Run them in sequence (013 first),
@@ -93,6 +104,23 @@ A's side panel + B's week ribbon, with weather moods). Reliability first.
   `RainViewerBackground.tsx`, where 016 adds only `setPadding`).
 - Not planned (audit §6, later): Met Office warnings, pollen/AQI, R5 forecast
   rain grid spike, `/api/version` nightly reload, MapLibre 6 / lucide 1.x bumps.
+
+### After the series (2026-10-17, on `staging`)
+
+- **017 amended**: the mood follows the current hour only
+  (`MOOD_LOOKAHEAD_HOURS = 1`), so the palette changes hour by hour instead of
+  previewing the next three. Forecast-driven changes still need two
+  confirmations; clock-driven ones apply at once and crossfade over 60 s.
+- **Portrait layout** for both the kiosk and the dev preview.
+- **Sun and Sky palettes**, **12-hour time**, and **settings on a tap of the
+  place name** (it replaced the 3-second hold, which nobody would find).
+- **Map fixes**: tile errors warn once per source instead of logging every
+  tile (f39eec3); the mood wash reaches the map as soon as the basemap
+  settles, not 20–30 s later (71f36a8).
+- **CI**: the lockfile is resynced with npm 10 so `npm ci` passes on Node 22
+  (9b3827b).
+- Known rough edge, not planned: the basemap swaps Positron ↔ Dark Matter
+  instantly at sunrise and sunset rather than fading.
 
 ## Dependency notes
 
