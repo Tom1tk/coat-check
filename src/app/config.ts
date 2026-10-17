@@ -15,3 +15,9 @@ export const WET = { mm: 0.2, probability: 50 } as const;
 export const COLD_FEELS_LIKE_C = 10;
 export const LAYER_FEELS_LIKE_C = 15;
 export const UMBRELLA_MAX_GUST_MPH = 25;
+
+// Per 15-minute slot: at or above this counts as rain in the 2-hour nowcast,
+// and the intensity bands (mm per 15 min ≈ ¼ of the usual mm/h bands).
+export const NOWCAST_RAIN_MM = 0.1;
+export const NOWCAST_MODERATE_MM = 0.6;
+export const NOWCAST_HEAVY_MM = 2;
