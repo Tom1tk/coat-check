@@ -119,8 +119,9 @@ A's side panel + B's week ribbon, with weather moods). Reliability first.
   settles, not 20–30 s later (71f36a8).
 - **CI**: the lockfile is resynced with npm 10 so `npm ci` passes on Node 22
   (9b3827b).
-- Known rough edge, not planned: the basemap swaps Positron ↔ Dark Matter
-  instantly at sunrise and sunset rather than fading.
+- **Basemap fade**: the basemap swaps Positron ↔ Dark Matter
+  at sunrise and sunset by dipping the map out over 0.8 s and back in once the
+  new style has drawn.
 
 ## Dependency notes
 

@@ -15,6 +15,10 @@ const MAP_LOAD_TIMEOUT_MS = 20_000;
 // After WebGL context loss, give the browser this long to restore it before
 // rebuilding the map.
 const CONTEXT_RESTORE_GRACE_MS = 5000;
+// Sunrise/sunset basemap swaps dip the map out and back in, at the boot
+// reveal's pace; a swap that never settles shows the map again after the cap.
+const BASEMAP_FADE_MS = 800;
+const BASEMAP_SETTLE_CAP_MS = 10_000;
 
 interface RainViewerBackgroundProps {
   onLoaded?: () => void;
@@ -374,6 +378,36 @@ function LocationMarker({ location }: { location: { latitude: number; longitude:
 // Washes the basemap with the mood's colour. It sits below the first radar
 // layer (\`rain-*\`), so the radar keeps its true colours, and is re-added
 // after a basemap swap drops it.
+// CARTO serves each style's sprite under the style's own path (on its tiles
+// host), and setStyle's diff updates the sprite, so it tells which basemap is
+// actually on the map.
+const spritePathFor = (styleUrl: string) => new URL(styleUrl).pathname.replace(/style\.json$/, "sprite");
+
+// Calls `onSettled` once a frame has drawn `styleUrl` with its tiles loaded
+// (or after a cap, so a stalled tile can't leave the map hidden). Not `idle`:
+// that also waits out paint transitions, and the mood tint's run a minute.
+function BasemapSettled({ styleUrl, onSettled }: { styleUrl: string; onSettled: () => void }) {
+  const { map } = useMap();
+
+  useEffect(() => {
+    if (!map) return;
+    const check = () => {
+      const sprite = map.getStyle()?.sprite;
+      if (typeof sprite === "string" && sprite.endsWith(spritePathFor(styleUrl)) && map.areTilesLoaded()) {
+        onSettled();
+      }
+    };
+    const timer = setTimeout(onSettled, BASEMAP_SETTLE_CAP_MS);
+    map.on("render", check);
+    return () => {
+      clearTimeout(timer);
+      map.off("render", check);
+    };
+  }, [map, styleUrl, onSettled]);
+
+  return null;
+}
+
 function MoodTint({ colour }: { colour: string }) {
   const { map } = useMap();
 
@@ -498,6 +532,22 @@ function RainViewerBackground({
   const [loaded, setLoaded] = useState(false);
   const failedLoadsRef = useRef(0);
 
+  // The basemap on the map lags `dark`: fade out, swap, then fade back in
+  // once the new style has drawn.
+  const [shownDark, setShownDark] = useState(dark);
+  const [settling, setSettling] = useState(false);
+  const settled = useCallback(() => setSettling(false), []);
+  useEffect(() => {
+    if (dark === shownDark) return;
+    const timer = setTimeout(() => {
+      setShownDark(dark);
+      setSettling(true);
+    }, BASEMAP_FADE_MS);
+    return () => clearTimeout(timer);
+  }, [dark, shownDark]);
+  const basemap = shownDark ? DARK_MATTER : POSITRON;
+  const hidden = dark !== shownDark || settling;
+
   const remount = useCallback((reason: string) => {
     console.warn(`[Map] rebuilding map: ${reason}`);
     setLoaded(false);
@@ -526,6 +576,8 @@ function RainViewerBackground({
         zIndex: -10,
         overflow: "hidden",
         pointerEvents: "none",
+        opacity: hidden ? 0 : 1,
+        transition: `opacity ${BASEMAP_FADE_MS}ms ease`,
       }}
     >
       <Map
@@ -539,8 +591,9 @@ function RainViewerBackground({
         touchZoomRotate={false}
         keyboard={false}
         trackResize={true}
-        styles={dark ? BASEMAP_STYLES.dark : BASEMAP_STYLES.light}
+        styles={shownDark ? BASEMAP_STYLES.dark : BASEMAP_STYLES.light}
       >
+        {settling && <BasemapSettled styleUrl={basemap} onSettled={settled} />}
         <MapWatchdog onLoadedChange={setLoaded} onRemount={remount} />
         {tint && <MoodTint colour={tint} />}
         <RainOverlayLayer
