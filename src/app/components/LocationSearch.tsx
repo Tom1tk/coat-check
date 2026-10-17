@@ -1,16 +1,15 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { u } from './kiosk/units';
 import { Location, Suggestion } from '../hooks/useLocation';
-import SpotlightCard from './SpotlightCard';
-import SpotlightText from './SpotlightText';
 import { Loader2 } from 'lucide-react';
 
 interface LocationSearchProps {
-    location: Location;
     setLocation: (loc: Location) => void;
 }
 
-export default function LocationSearch({ location, setLocation }: LocationSearchProps) {
-    const [searchVisible, setSearchVisible] = useState(false);
+// City search for the settings sheet: debounced suggestions, then Submit
+// geocodes the query and hands the place to `setLocation`.
+export default function LocationSearch({ setLocation }: LocationSearchProps) {
     const [searchQuery, setSearchQuery] = useState('');
     const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
     const [activeIndex, setActiveIndex] = useState(-1);
@@ -99,104 +98,107 @@ export default function LocationSearch({ location, setLocation }: LocationSearch
         }
     };
 
+    const submit = async () => {
+        if (!searchQuery) return;
+        setLoadingLocation(true);
+        try {
+            const res = await fetch(
+                `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(searchQuery)}&count=1`
+            );
+            const data = await res.json();
+            if (data.results && data.results.length > 0) {
+                const loc = data.results[0];
+                setLocation({ name: loc.name, latitude: loc.latitude, longitude: loc.longitude });
+            } else {
+                setErrorMessage('Location not found. Try another search.');
+            }
+        } catch (err) {
+            console.error(err);
+            setErrorMessage('Error fetching location data.');
+        } finally {
+            setLoadingLocation(false);
+        }
+    };
+
+    const field: React.CSSProperties = {
+        width: '100%',
+        boxSizing: 'border-box',
+        fontSize: u(18),
+        padding: `${u(10)} ${u(14)}`,
+        borderRadius: u(12),
+        border: '1px solid var(--divider)',
+        background: 'var(--card)',
+        color: 'var(--ink)',
+    };
+
     return (
-        <div className="mt-2 flex flex-col text-black items-center">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: u(8) }}>
+            <label htmlFor="location-search" className="sr-only">
+                Search for a city
+            </label>
+            <input
+                id="location-search"
+                name="location"
+                type="text"
+                placeholder="Enter city name…"
+                value={searchQuery}
+                onChange={handleInputChange}
+                onKeyDown={handleInputKeyDown}
+                autoComplete="off"
+                spellCheck={false}
+                role="combobox"
+                aria-expanded={suggestions.length > 0}
+                aria-controls="location-suggestions"
+                aria-autocomplete="list"
+                aria-activedescendant={activeIndex >= 0 ? `location-option-${activeIndex}` : undefined}
+                style={field}
+            />
+
+            {suggestions.length > 0 && (
+                <ul id="location-suggestions" role="listbox" style={{ ...field, padding: u(4), listStyle: 'none', margin: 0 }}>
+                    {suggestions.map((s, i) => (
+                        <li
+                            key={i}
+                            id={`location-option-${i}`}
+                            role="option"
+                            aria-selected={i === activeIndex}
+                            onClick={() => selectSuggestion(s)}
+                            style={{
+                                cursor: 'pointer',
+                                padding: `${u(8)} ${u(10)}`,
+                                borderRadius: u(8),
+                                background: i === activeIndex ? 'var(--today-tint)' : 'transparent',
+                            }}
+                        >
+                            {s.name}, {s.country}
+                        </li>
+                    ))}
+                </ul>
+            )}
+
             <button
-                onClick={() => setSearchVisible(!searchVisible)}
-                className="hover:text-grey focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 rounded"
+                onClick={submit}
+                style={{
+                    alignSelf: 'flex-start',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: u(8),
+                    fontSize: u(16),
+                    fontWeight: 600,
+                    padding: `${u(8)} ${u(16)}`,
+                    borderRadius: 999,
+                    background: 'var(--ok-bg)',
+                    color: 'var(--ok-fg)',
+                }}
             >
-                <SpotlightText className="underline">
-                    📍 Current Location - {location.name}
-                </SpotlightText>
+                {loadingLocation && <Loader2 className="animate-spin" style={{ width: u(16), height: u(16) }} aria-hidden="true" />}
+                {loadingLocation ? 'Submitting…' : 'Submit'}
             </button>
-
-            {searchVisible && (
-                <SpotlightCard className="mt-2 flex flex-col items-center glass-panel p-3 rounded-xl w-64">
-                    <label htmlFor="location-search" className="sr-only">
-                        Search for a city
-                    </label>
-                    <input
-                        id="location-search"
-                        name="location"
-                        type="text"
-                        placeholder="Enter city name…"
-                        value={searchQuery}
-                        onChange={handleInputChange}
-                        onKeyDown={handleInputKeyDown}
-                        autoComplete="off"
-                        spellCheck={false}
-                        role="combobox"
-                        aria-expanded={suggestions.length > 0}
-                        aria-controls="location-suggestions"
-                        aria-autocomplete="list"
-                        aria-activedescendant={activeIndex >= 0 ? `location-option-${activeIndex}` : undefined}
-                        className="border border-gray-300 rounded-md p-2 w-full focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:border-transparent"
-                    />
-
-                    {/* Suggestions dropdown */}
-                    {suggestions.length > 0 && (
-                        <ul id="location-suggestions" className="mt-1 max-h-40 overflow-y-auto w-full border border-gray-300 rounded-md bg-white" role="listbox">
-                            {suggestions.map((s, i) => (
-                                <li
-                                    key={i}
-                                    id={`location-option-${i}`}
-                                    role="option"
-                                    aria-selected={i === activeIndex}
-                                    className={`p-2 cursor-pointer hover:bg-blue-100 focus-visible:bg-blue-100 focus-visible:outline-none ${i === activeIndex ? 'bg-blue-100' : ''}`}
-                                    onClick={() => {
-                                        // Just update the search box, don't submit yet
-                                        selectSuggestion(s);
-                                    }}
-                                >
-                                    {s.name}, {s.country}
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-
-                    {/* Manual submit button & error message */}
-                    <button
-                        onClick={async () => {
-                            if (!searchQuery) return;
-                            setLoadingLocation(true);
-                            try {
-                                const res = await fetch(
-                                    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
-                                        searchQuery
-                                    )}&count=1`
-                                );
-                                const data = await res.json();
-                                if (data.results && data.results.length > 0) {
-                                    const loc = data.results[0];
-                                    const newLoc = {
-                                        name: loc.name,
-                                        latitude: loc.latitude,
-                                        longitude: loc.longitude,
-                                    };
-                                    setLocation(newLoc);
-                                    // Close the search UI
-                                    setSearchVisible(false);
-                                } else {
-                                    setErrorMessage('Location not found. Try another search.');
-                                }
-                            } catch (err) {
-                                console.error(err);
-                                setErrorMessage('Error fetching location data.');
-                            } finally {
-                                setLoadingLocation(false);
-                            }
-                        }}
-                        className="bg-blue-500 hover:bg-blue-600 text-black font-semibold py-1 px-3 rounded-md mt-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 flex items-center gap-2"
-                    >
-                        {loadingLocation && (
-                            <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-                        )}
-                        {loadingLocation ? 'Submitting…' : 'Submit'}
-                    </button>
-                    {errorMessage && <p className="text-red-600 mt-1 text-sm" role="alert">{errorMessage}</p>}
-                </SpotlightCard>
+            {errorMessage && (
+                <p role="alert" style={{ fontSize: u(14), color: 'var(--accent-coat)' }}>
+                    {errorMessage}
+                </p>
             )}
         </div>
     );
 }
-

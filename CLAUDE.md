@@ -23,16 +23,31 @@ Deployed on Vercel at coat-check.vercel.app.
 
 ## Architecture (src/)
 
-- `app/page.tsx` — main client component: layout, fade choreography, wiring
+- `app/page.tsx` — the kiosk: composes map, panel, nowcast card, week
+  ribbon and settings sheet; one boot-time `<Reveal>`, no other fades
 - `app/api/rain-tiles/` — server-side tile proxy; holds the OpenWeatherMap
   key so it never reaches the client
 - `app/hooks/` — one hook per file (`useWeather` fetches Open-Meteo;
   `useLocation` persists to localStorage; `useSunCalc` derives day/night)
-- `app/utils/` — pure functions (weather-code mapping, coat rules)
-- `app/components/` — presentational components; glass-morphism via the
-  `glass-panel` class + `SpotlightCard`
+- `app/utils/` — pure functions (weather-code mapping, coat rules; the
+  view models `panelModel`, `weekRibbon`, `nowcast`; `kioskParams`, `burnIn`)
+- `app/components/kiosk/` — the hybrid layout (boards G1/G2): `Panel` (clock,
+  verdict, window cards, live stats, rain strip), `NowcastCard`, `WeekRibbon`,
+  `SettingsSheet`, `Reveal`. Sizes go through `u()` (1920×1080 reference
+  pixels scaled by `--u`); colours only through the tokens in `globals.css`
+- `app/components/` — shared pieces (`WeatherIcon`, `StatusChip`,
+  `RadarTimestamp`, `LocationSearch`, the map background)
+- `app/dev/kiosk` — dev-only fixture preview (`?at=`, `?dark`, `?map`,
+  `?settings`); 404 in production
 - `components/ui/map.tsx` — VENDORED MapLibre wrapper from mapcn; do not
   edit it for app-level concerns
+
+## URL params (kiosk setup)
+
+Params pin config and win over localStorage: `lat`, `lon` (+ optional
+`name`), `zoom` (8/7/6/5), `radar=still`. `?settings` opens the settings
+sheet; otherwise it opens on a 3 s hold on the place name. Invalid params are
+ignored with a `console.warn`.
 
 ## Conventions
 

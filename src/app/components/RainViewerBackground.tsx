@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { RadarFrame, frameDiff, rainViewerTileUrl } from "@/app/utils/radarFrames";
 import { backoffFor } from "@/app/utils/freshness";
 import type { RadarSource } from "@/app/hooks/useRadar";
+import type { MapPadding } from "@/app/hooks/useMapPadding";
 import RadarTimestamp from "./RadarTimestamp";
 
 // A map that hasn't finished loading after this long is torn down and
@@ -21,7 +22,13 @@ interface RainViewerBackgroundProps {
   zoom?: number;
   radar: RadarSource;
   fallbackStamp: number;
+  // Screen area covered by the UI; the location centres in what's left.
+  padding?: MapPadding;
+  // Where the radar legend chip is portalled (outside the aria-hidden map).
+  legendTarget?: HTMLElement | null;
 }
+
+const NO_PADDING: MapPadding = { top: 0, right: 0, bottom: 0, left: 0 };
 
 type MapInstance = NonNullable<ReturnType<typeof useMap>["map"]>;
 
@@ -47,7 +54,7 @@ function ensureFrameLayer(map: MapInstance, frame: RadarFrame) {
       tiles: [rainViewerTileUrl(frame)],
       tileSize: 512,
       // RainViewer's native max zoom is 7 (z8 returns an error image); the
-      // ZoomControl goes to 8, so MapLibre overzooms instead.
+      // zoom setting goes to 8, so MapLibre overzooms instead.
       maxzoom: 7,
       attribution: RAINVIEWER_ATTRIBUTION,
     });
@@ -234,12 +241,16 @@ function RainOverlayLayer({
   zoom = 8,
   radar,
   fallbackStamp,
+  padding,
+  legendTarget,
 }: {
   location: { latitude: number; longitude: number };
   onLoaded?: () => void;
   zoom?: number;
   radar: RadarSource;
   fallbackStamp: number;
+  padding: MapPadding;
+  legendTarget: HTMLElement | null;
 }) {
   const { map, isLoaded } = useMap();
 
@@ -252,6 +263,13 @@ function RainOverlayLayer({
 
   const { shown, newest } = useRadarLoop(map, isLoaded, Array.isArray(radar) ? radar : null);
   useFallbackLayer(map, isLoaded, radar === "fallback", fallbackStamp);
+
+  // Keep the location centred in the area the UI leaves free. setPadding keeps
+  // the centre coordinate, so the view shifts without a fly-to.
+  useEffect(() => {
+    if (!map) return;
+    map.setPadding(padding);
+  }, [map, padding]);
 
   // Consolidated fly-to effect for location AND zoom changes
   // Using a ref to track previous values to avoid redundant animations
@@ -288,14 +306,9 @@ function RainOverlayLayer({
     prevZoomRef.current = zoom;
   }, [map, location, zoom]);
 
-  // Portalled out of the aria-hidden map so it is readable; plan 016 places it.
-  if (!shown || !newest) return null;
-  return createPortal(
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40">
-      <RadarTimestamp frame={shown} newest={newest} />
-    </div>,
-    document.body
-  );
+  // Portalled out of the aria-hidden map into the slot the layout provides.
+  if (!shown || !newest || !legendTarget) return null;
+  return createPortal(<RadarTimestamp frame={shown} newest={newest} />, legendTarget);
 }
 
 
@@ -366,6 +379,8 @@ function RainViewerBackground({
   zoom = 8,
   radar,
   fallbackStamp,
+  padding = NO_PADDING,
+  legendTarget = null,
 }: RainViewerBackgroundProps): JSX.Element {
   const [mapKey, setMapKey] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -424,6 +439,8 @@ function RainViewerBackground({
           zoom={zoom}
           radar={radar}
           fallbackStamp={fallbackStamp}
+          padding={padding}
+          legendTarget={legendTarget}
         />
         <LocationMarker location={location} />
       </Map>
@@ -438,7 +455,9 @@ export default React.memo(RainViewerBackground, (prevProps, nextProps) => {
     prevProps.location?.longitude === nextProps.location?.longitude &&
     prevProps.zoom === nextProps.zoom &&
     prevProps.radar === nextProps.radar &&
-    prevProps.fallbackStamp === nextProps.fallbackStamp
+    prevProps.fallbackStamp === nextProps.fallbackStamp &&
+    prevProps.padding === nextProps.padding &&
+    prevProps.legendTarget === nextProps.legendTarget
     // Intentionally ignoring onLoaded since it doesn't change behavior once called
   );
 });

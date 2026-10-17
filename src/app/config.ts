@@ -21,3 +21,7 @@ export const UMBRELLA_MAX_GUST_MPH = 25;
 export const NOWCAST_RAIN_MM = 0.1;
 export const NOWCAST_MODERATE_MM = 0.6;
 export const NOWCAST_HEAVY_MM = 2;
+
+// Map zoom levels the kiosk offers (settings sheet, `?zoom=`).
+export const ZOOM_LEVELS = [8, 7, 6, 5] as const;
+export const DEFAULT_ZOOM = 8;
