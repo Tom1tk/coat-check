@@ -1,18 +1,24 @@
 // app/components/RainViewerBackground.tsx
 "use client";
-import React, { JSX, useEffect, useRef, useState } from "react";
+import React, { JSX, useCallback, useEffect, useRef, useState } from "react";
 import { Map, MapMarker, MarkerContent, useMap } from "@/components/ui/map";
-import { RadarFrame, latestRadarFrame, rainViewerTileUrl } from "@/app/utils/radarFrames";
+import { RadarFrame, rainViewerTileUrl } from "@/app/utils/radarFrames";
+import { backoffFor } from "@/app/utils/freshness";
+import type { RadarSource } from "@/app/hooks/useRadar";
 
-// How long to wait for the RainViewer frame index before giving up and
-// falling back to the OWM proxy tiles.
-const FRAME_INDEX_TIMEOUT_MS = 8000;
+// A map that hasn't finished loading after this long is torn down and
+// rebuilt (e.g. the CARTO style request failed). Later attempts add backoff.
+const MAP_LOAD_TIMEOUT_MS = 20_000;
+// After WebGL context loss, give the browser this long to restore it before
+// rebuilding the map.
+const CONTEXT_RESTORE_GRACE_MS = 5000;
 
 interface RainViewerBackgroundProps {
   onLoaded?: () => void;
   location?: { latitude: number; longitude: number };
   zoom?: number;
-  refreshKey?: number;
+  radar: RadarSource;
+  fallbackStamp: number;
 }
 
 // Component to add rain overlay layer and trigger onLoaded callback
@@ -20,59 +26,26 @@ function RainOverlayLayer({
   location,
   onLoaded,
   zoom = 8,
-  refreshKey = 0
+  radar,
+  fallbackStamp,
 }: {
   location: { latitude: number; longitude: number };
   onLoaded?: () => void;
   zoom?: number;
-  refreshKey?: number;
+  radar: RadarSource;
+  fallbackStamp: number;
 }) {
   const { map, isLoaded } = useMap();
-  // null = frame index not yet fetched; 'fallback' = use the OWM proxy
-  // because the RainViewer frame index couldn't be fetched or parsed.
-  const [radarFrame, setRadarFrame] = useState<RadarFrame | null | 'fallback'>(null);
 
-  // Fetch the RainViewer frame index (the latest radar composite frame).
-  // Falls back to the OWM proxy tiles on any network error, non-2xx
-  // response, or malformed payload.
-  useEffect(() => {
-    const controller = new AbortController();
-    let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      controller.abort();
-    }, FRAME_INDEX_TIMEOUT_MS);
-    fetch('https://api.rainviewer.com/public/weather-maps.json', { signal: controller.signal })
-      .then((res) => {
-        if (!res.ok) throw new Error(`RainViewer index HTTP ${res.status}`);
-        return res.json();
-      })
-      .then((json) => {
-        clearTimeout(timer);
-        const frame = latestRadarFrame(json);
-        if (frame === null) throw new Error('RainViewer index malformed or empty');
-        setRadarFrame(frame);
-      })
-      .catch((err) => {
-        if (controller.signal.aborted && !timedOut) return; // unmount/re-run abort
-        console.warn('[RainViewer] frame fetch failed, falling back to OWM tiles:', err);
-        setRadarFrame('fallback');
-      });
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-  }, [refreshKey]);
-
-  // Reveal the page as soon as the map is ready — the radar layer pops in
-  // later when its frame index arrives (matches pre-RainViewer timing).
+  // Reveal the map as soon as it is ready — the radar layer pops in
+  // later when its frame index arrives.
   useEffect(() => {
     if (!map || !isLoaded) return;
     onLoaded?.();
   }, [map, isLoaded, onLoaded]);
 
   useEffect(() => {
-    if (!map || !isLoaded || radarFrame === null) return;
+    if (!map || !isLoaded || radar === null) return;
 
     const addRainLayer = (frame: RadarFrame | 'fallback', key: number) => {
       const layerId = 'rain-layer';
@@ -135,18 +108,23 @@ function RainOverlayLayer({
     // version raced its own listener registration against MapLibre's
     // 'styledata' events during setStyle and could permanently lose the
     // rain layer on a theme toggle.)
-    addRainLayer(radarFrame, refreshKey);
+    addRainLayer(radar, fallbackStamp);
 
     return () => {
-      // Cleanup on unmount or before re-adding for a style/frame change
-      if (map.getLayer('rain-layer')) {
-        map.removeLayer('rain-layer');
-      }
-      if (map.getSource('rain-tiles')) {
-        map.removeSource('rain-tiles');
+      // Cleanup on unmount or before re-adding for a style/frame change. On a
+      // watchdog rebuild the map may already have been removed.
+      try {
+        if (map.getLayer('rain-layer')) {
+          map.removeLayer('rain-layer');
+        }
+        if (map.getSource('rain-tiles')) {
+          map.removeSource('rain-tiles');
+        }
+      } catch {
+        // The map was already removed (watchdog rebuild) — nothing to clean up.
       }
     };
-  }, [map, isLoaded, refreshKey, radarFrame]);
+  }, [map, isLoaded, radar, fallbackStamp]);
 
   // Consolidated fly-to effect for location AND zoom changes
   // Using a ref to track previous values to avoid redundant animations
@@ -207,12 +185,77 @@ function LocationMarker({ location }: { location: { latitude: number; longitude:
   );
 }
 
+// Reports load state upward and asks for a rebuild when the WebGL context is
+// lost and not restored (GPU reset, driver sleep) — otherwise the map stays
+// blank until a human reloads the page.
+function MapWatchdog({
+  onLoadedChange,
+  onRemount,
+}: {
+  onLoadedChange: (loaded: boolean) => void;
+  onRemount: (reason: string) => void;
+}) {
+  const { map, isLoaded } = useMap();
+
+  useEffect(() => {
+    onLoadedChange(Boolean(map && isLoaded));
+  }, [map, isLoaded, onLoadedChange]);
+
+  useEffect(() => {
+    if (!map) return;
+    const canvas = map.getCanvas();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const onLost = () => {
+      console.warn('[Map] WebGL context lost');
+      timer = setTimeout(() => onRemount('webgl context lost'), CONTEXT_RESTORE_GRACE_MS);
+    };
+    const onRestored = () => {
+      console.info('[Map] WebGL context restored');
+      if (timer) clearTimeout(timer);
+      timer = null;
+    };
+    canvas.addEventListener('webglcontextlost', onLost);
+    canvas.addEventListener('webglcontextrestored', onRestored);
+    return () => {
+      if (timer) clearTimeout(timer);
+      canvas.removeEventListener('webglcontextlost', onLost);
+      canvas.removeEventListener('webglcontextrestored', onRestored);
+    };
+  }, [map, onRemount]);
+
+  return null;
+}
+
 function RainViewerBackground({
   onLoaded,
   location = { latitude: 52.2053, longitude: 0.1218 }, // default Cambridge
   zoom = 8,
-  refreshKey = 0,
+  radar,
+  fallbackStamp,
 }: RainViewerBackgroundProps): JSX.Element {
+  const [mapKey, setMapKey] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+  const failedLoadsRef = useRef(0);
+
+  const remount = useCallback((reason: string) => {
+    console.warn(`[Map] rebuilding map: ${reason}`);
+    setLoaded(false);
+    setMapKey((k) => k + 1);
+  }, []);
+
+  // Boot watchdog: rebuild a map that never finishes loading, with backoff.
+  useEffect(() => {
+    if (loaded) {
+      failedLoadsRef.current = 0;
+      return;
+    }
+    const timer = setTimeout(() => {
+      failedLoadsRef.current += 1;
+      remount(`not loaded after timeout (attempt ${failedLoadsRef.current})`);
+    }, MAP_LOAD_TIMEOUT_MS + backoffFor(failedLoadsRef.current));
+    return () => clearTimeout(timer);
+  }, [mapKey, loaded, remount]);
+
   return (
     <div
       aria-hidden
@@ -225,6 +268,7 @@ function RainViewerBackground({
       }}
     >
       <Map
+        key={mapKey}
         center={[location.longitude, location.latitude]}
         zoom={zoom}
         interactive={false}
@@ -239,7 +283,14 @@ function RainViewerBackground({
           dark: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
         }}
       >
-        <RainOverlayLayer location={location} onLoaded={onLoaded} zoom={zoom} refreshKey={refreshKey} />
+        <MapWatchdog onLoadedChange={setLoaded} onRemount={remount} />
+        <RainOverlayLayer
+          location={location}
+          onLoaded={onLoaded}
+          zoom={zoom}
+          radar={radar}
+          fallbackStamp={fallbackStamp}
+        />
         <LocationMarker location={location} />
       </Map>
     </div>
@@ -252,8 +303,8 @@ export default React.memo(RainViewerBackground, (prevProps, nextProps) => {
     prevProps.location?.latitude === nextProps.location?.latitude &&
     prevProps.location?.longitude === nextProps.location?.longitude &&
     prevProps.zoom === nextProps.zoom &&
-    prevProps.refreshKey === nextProps.refreshKey
+    prevProps.radar === nextProps.radar &&
+    prevProps.fallbackStamp === nextProps.fallbackStamp
     // Intentionally ignoring onLoaded since it doesn't change behavior once called
   );
 });
-

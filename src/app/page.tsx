@@ -1,17 +1,22 @@
 'use client';
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import SunCalc from 'suncalc';
 import { useTheme } from 'next-themes';
 import RainViewerBackground from './components/RainViewerBackground';
 import { useLocation, Location as AppLocation } from './hooks/useLocation';
 import { useWeather } from './hooks/useWeather';
 import { useSunCalc } from './hooks/useSunCalc';
 import { useAutoTheme } from './hooks/useAutoTheme';
-import { useAutoRefresh } from './hooks/useAutoRefresh';
+import { useScheduler } from './hooks/useScheduler';
+import { useRadar } from './hooks/useRadar';
+import { useClock } from './hooks/useClock';
+import { MAX_AGE_MS } from './utils/freshness';
+import { chipStatus } from './utils/statusChip';
+import StatusChip from './components/StatusChip';
 import Header from './components/Header';
 import WeatherCard from './components/WeatherCard';
 import CurrentWeatherCard from './components/CurrentWeatherCard';
 import LoadingScreen from './components/LoadingScreen';
-import SpotlightCard from './components/SpotlightCard';
 import ZoomControl from './components/ZoomControl';
 import ThemeToggle from './components/ThemeToggle';
 
@@ -19,16 +24,25 @@ export default function Home() {
   // 🌍 Location state
   const { location, updateLocation } = useLocation();
 
-  // ☀️ Sun/Moon Calc - with trigger to force recalculation on tab wake
-  const [sunCalcTrigger, setSunCalcTrigger] = useState(0);
-  const { isDay } = useSunCalc(location.latitude, location.longitude, sunCalcTrigger);
+  // 🕰️ Minute clock: drives sunrise/sunset checks and the hourly roll-over
+  const now = useClock();
+  const minuteKey = Math.floor(now / 60_000);
+  const hourKey = String(Math.floor(now / 3_600_000));
+
+  // ☀️ Sun/Moon Calc - recomputed every minute so the theme flips on time
+  const { isDay } = useSunCalc(location.latitude, location.longitude, minuteKey);
   const { setTheme, resolvedTheme } = useTheme();
 
-  // Weather states
-  const { todayWeather, tomorrowWeather, currentHourWeather, refresh: refreshWeather, error } = useWeather(location);
+  // Weather + radar data, kept fresh by data age (no reloads, no input)
+  const weather = useWeather(location, hourKey);
+  const { todayWeather, tomorrowWeather, currentHourWeather } = weather;
+  const radar = useRadar();
+  const scheduler = useScheduler({
+    forecast: { fetch: weather.fetcher, lastSuccess: weather.lastSuccess, key: weather.key },
+    radar: { fetch: radar.fetcher },
+  });
   const [displayDay, setDisplayDay] = useState<'today' | 'tomorrow'>('today');
   const [fade, setFade] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
 
   // Staged fade controls
   const [loadingTextVisible, setLoadingTextVisible] = useState(true);
@@ -42,40 +56,9 @@ export default function Home() {
 
   useAutoTheme(isDay, setTheme);
 
-  // handleRefresh (below) needs the hook's notifyManualRefresh, and
-  // useAutoRefresh (below) needs handleRefresh as its onRefresh argument —
-  // a genuine circular dependency. Bridge it with a ref kept fresh every
-  // render so handleRefresh always calls the current notifyManualRefresh
-  // without needing it in its own dependency array.
-  const notifyManualRefreshRef = useRef<() => void>(() => {});
-
-  // Manual refresh handler - ALWAYS forces full refresh, bypassing all staleness checks
-  const handleRefresh = useCallback(() => {
-    setFade(true);
-    setTimeout(() => {
-      // Trigger weather data refresh
-      refreshWeather();
-      // Trigger map rain layer refresh (bust cache)
-      setRefreshKey(prev => prev + 1);
-      // Trigger sun calc recalculation (updates isDay/theme if needed)
-      setSunCalcTrigger(prev => prev + 1);
-      // Update stored hour state so auto-refresh knows we just refreshed
-      notifyManualRefreshRef.current();
-
-      // Wait for fade duration before fading back in
-      setTimeout(() => {
-        setFade(false);
-      }, FADE_DURATION);
-    }, FADE_DURATION);
-  }, [refreshWeather, FADE_DURATION]);
-
-  const handleSunRecalc = useCallback(() => setSunCalcTrigger(prev => prev + 1), []);
-
-  const { minutesLeft, notifyManualRefresh } = useAutoRefresh(handleRefresh, handleSunRecalc);
-  notifyManualRefreshRef.current = notifyManualRefresh;
-
   const allWeatherLoaded = currentHourWeather !== null && todayWeather !== null && tomorrowWeather !== null;
-  const allReady = allWeatherLoaded && mapLoaded;
+  // The map never gates the UI: it fades in by itself once loaded.
+  const allReady = allWeatherLoaded;
 
   const handleDayToggle = () => {
     setFade(true);
@@ -93,13 +76,10 @@ export default function Home() {
 
       // Calculate isDay for the NEW location immediately to switch theme while hidden
       // Note: We can't use the hook value 'isDay' here yet because 'location' state hasn't propagated to the hook re-render.
-      // Use suncalc directly (already imported via useSunCalc's underlying usage)
-      import('suncalc').then((SunCalc) => {
-        const now = new Date();
-        const times = SunCalc.default.getTimes(now, newLoc.latitude, newLoc.longitude);
-        const newIsDay = now >= times.sunrise && now < times.sunset;
-        setTheme(newIsDay ? 'light' : 'dark');
-      });
+      // Static import: a lazy chunk can 404 after a deploy in a tab that never reloads.
+      const current = new Date();
+      const times = SunCalc.getTimes(current, newLoc.latitude, newLoc.longitude);
+      setTheme(current >= times.sunrise && current < times.sunset ? 'light' : 'dark');
 
       // Wait for flyover (2000ms) + buffer (250ms)
       setTimeout(() => {
@@ -130,14 +110,48 @@ export default function Home() {
     localStorage.setItem('zoomLevel', zoomLevel.toString());
   }, [zoomLevel]);
 
+  // One-time cleanup of the retired hourly-refresh bookkeeping (plan 013).
+  useEffect(() => {
+    try {
+      localStorage.removeItem('lastRefreshedHour');
+      localStorage.removeItem('lastRefreshedDate');
+    } catch {
+      // storage unavailable (private mode) — nothing to clean up
+    }
+  }, []);
+
   // 🌟 Staged fade sequence
   useEffect(() => {
-    if (allReady) {
-      setTimeout(() => setLoadingTextVisible(false), STEP_DELAY);
-      setTimeout(() => setBackgroundVisible(true), STEP_DELAY * 2);
-      setTimeout(() => setPageVisible(true), STEP_DELAY * 3);
-    }
+    if (!allReady) return;
+    const timers = [
+      setTimeout(() => setLoadingTextVisible(false), STEP_DELAY),
+      setTimeout(() => setPageVisible(true), STEP_DELAY * 3),
+    ];
+    return () => timers.forEach(clearTimeout);
   }, [allReady]);
+
+  // The map fades in on its own schedule, independent of the weather.
+  useEffect(() => {
+    if (!mapLoaded) return;
+    const timer = setTimeout(() => setBackgroundVisible(true), STEP_DELAY * 2);
+    return () => clearTimeout(timer);
+  }, [mapLoaded]);
+
+  const status = useMemo(
+    () =>
+      chipStatus({
+        now,
+        online: scheduler.online,
+        forecastLastSuccess: scheduler.sources.forecast.lastSuccess,
+        forecastFailures: scheduler.sources.forecast.failures,
+        forecastMaxAge: MAX_AGE_MS.forecast,
+        fromCache: weather.fromCache,
+        radarFailures: scheduler.sources.radar.failures,
+        formatTime: (ms) =>
+          new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+      }),
+    [now, scheduler, weather.fromCache]
+  );
 
   const currentWeather = displayDay === 'today' ? todayWeather : tomorrowWeather;
 
@@ -153,27 +167,18 @@ export default function Home() {
           location={location}
           onLoaded={() => setMapLoaded(true)}
           zoom={zoomLevel}
-          refreshKey={refreshKey}
+          radar={radar.source}
+          fallbackStamp={radar.fallbackStamp}
         />
       </div>
 
       {/* Loading Screen */}
       {!pageVisible && <LoadingScreen visible={loadingTextVisible} FADE_DURATION={FADE_DURATION} />}
 
-      {/* Weather fetch error */}
-      {error && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center">
-          <SpotlightCard className="glass-panel rounded-2xl p-6 max-w-md text-center text-black dark:text-white text-legible">
-            <p className="font-semibold">{error}</p>
-            <button
-              onClick={() => refreshWeather()}
-              className="mt-4 bg-blue-500 hover:bg-blue-600 text-black font-semibold py-1 px-3 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
-            >
-              Retry
-            </button>
-          </SpotlightCard>
-        </div>
-      )}
+      {/* Data status — visible from boot, above the loading screen */}
+      <div className="fixed bottom-4 right-4 z-[60]">
+        <StatusChip status={status} />
+      </div>
 
       {/* Main Content */}
       {allReady && currentWeather && (
@@ -207,28 +212,12 @@ export default function Home() {
           )}
 
 
-          {/* Manual Refresh + Countdown + Zoom Control */}
+          {/* Zoom Control (above the status chip) */}
           <div
-            className={`fixed bottom-4 right-4 flex flex-col items-center space-y-2 transition-opacity duration-500 z-50 ${pageVisible ? 'opacity-100' : 'opacity-0'
+            className={`fixed bottom-16 right-4 transition-opacity duration-500 z-50 ${pageVisible ? 'opacity-100' : 'opacity-0'
               }`}
           >
             <ZoomControl currentZoom={zoomLevel} onZoomChange={setZoomLevel} />
-
-            <SpotlightCard className="glass-panel px-3 py-1 rounded-md shadow-sm">
-              <p className="text-xs text-black dark:text-white text-legible">
-                {minutesLeft !== null
-                  ? `Auto Refresh in: 0:${minutesLeft.toString().padStart(2, '0')}`
-                  : ''}
-              </p>
-            </SpotlightCard>
-
-            <SpotlightCard
-              onClick={handleRefresh}
-              className="glass-panel cursor-pointer hover:bg-blue-100/20 text-black dark:text-white text-legible font-bold py-2 px-4 rounded-full shadow-lg flex items-center justify-center"
-              title="Refresh weather and map"
-            >
-              🔄 Refresh
-            </SpotlightCard>
           </div>
 
           {/* Theme Toggle Button (Bottom Left) */}

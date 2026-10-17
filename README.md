@@ -36,21 +36,21 @@ Live at: **[coat-check.vercel.app](https://coat-check.vercel.app/)**
 - Geocoding powered by Open-Meteo API
 - Location persisted in localStorage across sessions
 
-### Robust Auto-Refresh System
-A hybrid approach ensures data is **always fresh** when you need it:
+### Kiosk-Grade Self-Updating
+Built to be left on a wall display with no input:
 
 | Mechanism | What It Does |
 |-----------|--------------|
-| **Hour-based staleness** | Refreshes at the top of each hour (minute 1) |
-| **Heartbeat detection** | Detects browser tab suspension (30s heartbeat, 60s tolerance) |
-| **Multiple wake events** | Listens to `visibilitychange`, `focus`, and `pageshow` events |
-| **LocalStorage persistence** | Survives browser restarts; only refreshes if hour changed |
+| **Data-age scheduler** | Refetches each source when its data is older than its max age (forecast 15 min, radar 5 min), checked every 30 s and on wake/reconnect |
+| **Backoff, never a modal** | Failed fetches retry at 30 s → 10 min; the screen keeps showing the last good data |
+| **Last-good cache** | The latest forecast is kept in localStorage, so a cold or offline boot shows data immediately |
+| **Map self-recovery** | The map rebuilds itself if it fails to load or loses its WebGL context |
+| **Status chip** | Shows when data was last updated, and turns amber/red as it ages or goes offline |
 
 ### Premium UI
 - **Glass-morphism cards** with spotlight hover effects
-- **Smooth fade transitions** on all data updates
+- **Quiet data swaps** — updates land in place without fading the screen
 - **Zoom control** for map (4 levels, persisted to localStorage)
-- **Countdown timer** showing minutes until next auto-refresh
 
 ---
 
@@ -106,7 +106,7 @@ case the app falls back to OpenWeatherMap tiles (which need the key).
 ```
 src/
 ├── app/
-│   ├── page.tsx                 # Main app component + refresh logic
+│   ├── page.tsx                 # Main app component + wiring
 │   ├── layout.tsx               # Root layout with theme provider
 │   ├── globals.css              # Global styles + glass-panel utilities
 │   │
@@ -123,7 +123,10 @@ src/
 │   │   └── LoadingScreen.tsx          # Initial loading state
 │   │
 │   ├── hooks/
-│   │   ├── useWeather.ts        # Fetches and processes weather data
+│   │   ├── useWeather.ts        # Fetches, caches and derives weather data
+│   │   ├── useScheduler.ts      # Data-age refresh scheduler with backoff
+│   │   ├── useRadar.ts          # RainViewer frame index (OWM fallback)
+│   │   ├── useClock.ts          # Minute-boundary clock
 │   │   ├── useLocation.ts       # Location state + localStorage
 │   │   └── useSunCalc.ts        # Sunrise/sunset calculations
 │   │

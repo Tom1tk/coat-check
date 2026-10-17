@@ -38,7 +38,9 @@ Deployed on Vercel at coat-check.vercel.app.
 
 - All UI is client components (`'use client'`); no server data fetching
   except the rain-tiles proxy route
-- State persisted to localStorage: location, zoomLevel, lastRefreshedHour
+- State persisted to localStorage: location, zoomLevel, forecastCache (last
+  good Open-Meteo payload). Data refresh is driven by data age in
+  `hooks/useScheduler.ts` — never by reloads or clock boundaries
 - Never build Tailwind class names from template variables — Tailwind can't
   see them at build time; use inline `style` for dynamic values
 - Implementation plans live in `plans/` — read `plans/README.md` before

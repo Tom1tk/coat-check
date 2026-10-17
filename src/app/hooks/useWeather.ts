@@ -1,7 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { WeatherData, CurrentHourWeather, codeToCondition } from '../utils/weatherUtils';
 import { Location } from './useLocation';
 import { getCoatAdvice } from '../utils/coatAdvice';
+import {
+    FORECAST_CACHE_KEY,
+    locationKey,
+    parseForecastCache,
+    serializeForecastCache,
+} from '../utils/forecastCache';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type OpenMeteoResponse = any;
@@ -89,42 +95,118 @@ export function deriveDayWeather(data: OpenMeteoResponse, dayOffset: number): We
     };
 }
 
-export function useWeather(location: Location) {
-    const [todayWeather, setTodayWeather] = useState<WeatherData | null>(null);
-    const [tomorrowWeather, setTomorrowWeather] = useState<WeatherData | null>(null);
-    const [currentHourWeather, setCurrentHourWeather] = useState<CurrentHourWeather | null>(null);
-    const [error, setError] = useState<string | null>(null);
+const FETCH_TIMEOUT_MS = 10_000;
 
-    const refresh = useCallback(async () => {
-        try {
-            const { latitude, longitude } = location;
-            // Single API call with timezone=auto for accurate local time calculation
-            const res = await fetch(
-                `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,precipitation,weathercode&timezone=auto`
-            );
-            if (!res.ok) {
-                throw new Error(`Weather API returned ${res.status}`);
-            }
-            const data = await res.json();
-
-            // Derive all weather states from the single response
-            const current = deriveCurrentHourWeather(data);
-            const today = deriveDayWeather(data, 0);
-            const tomorrow = deriveDayWeather(data, 1);
-
-            setCurrentHourWeather(current);
-            setTodayWeather(today);
-            setTomorrowWeather(tomorrow);
-            setError(null);
-        } catch (err) {
-            console.error('[Weather] fetch failed:', err);
-            setError('Could not load weather data. Check your connection and try again.');
+export async function fetchForecast(location: { latitude: number; longitude: number }): Promise<OpenMeteoResponse> {
+    const { latitude, longitude } = location;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    try {
+        // Single API call with timezone=auto for accurate local time calculation
+        const res = await fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,precipitation,weathercode&timezone=auto`,
+            { signal: controller.signal }
+        );
+        if (!res.ok) {
+            throw new Error(`Weather API returned ${res.status}`);
         }
+        return await res.json();
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+export interface DerivedWeather {
+    todayWeather: WeatherData;
+    tomorrowWeather: WeatherData;
+    currentHourWeather: CurrentHourWeather;
+}
+
+// Null when the payload no longer covers "now" (e.g. a very old cache).
+export function deriveAll(data: OpenMeteoResponse): DerivedWeather | null {
+    try {
+        return {
+            currentHourWeather: deriveCurrentHourWeather(data),
+            todayWeather: deriveDayWeather(data, 0),
+            tomorrowWeather: deriveDayWeather(data, 1),
+        };
+    } catch (err) {
+        console.warn('[Weather] payload does not cover the current time:', err);
+        return null;
+    }
+}
+
+interface Payload {
+    key: string;
+    savedAt: number;
+    live: boolean; // false = restored from the localStorage cache
+    data: OpenMeteoResponse;
+}
+
+function readCache(location: Location): Payload | null {
+    try {
+        const cached = parseForecastCache(localStorage.getItem(FORECAST_CACHE_KEY), location);
+        return cached && { key: locationKey(location), savedAt: cached.savedAt, live: false, data: cached.data };
+    } catch (err) {
+        console.warn('[Weather] could not read forecast cache:', err);
+        return null;
+    }
+}
+
+function writeCache(location: Location, savedAt: number, data: OpenMeteoResponse): void {
+    try {
+        localStorage.setItem(
+            FORECAST_CACHE_KEY,
+            serializeForecastCache({
+                savedAt,
+                location: { latitude: location.latitude, longitude: location.longitude },
+                data,
+            })
+        );
+    } catch (err) {
+        console.warn('[Weather] could not write forecast cache:', err);
+    }
+}
+
+// Holds the last good payload (live or cached) and derives the displayed
+// weather from it for the current hour. The scheduler calls `fetcher`;
+// failures throw so it can back off — nothing here retries or blocks the UI.
+// `hourKey` changes at least hourly so derivation rolls over without a refetch.
+export function useWeather(location: Location, hourKey: string) {
+    const key = locationKey(location);
+    const [payload, setPayload] = useState<Payload | null>(null);
+
+    // Show the cached payload for this location immediately (in an effect, not
+    // a state initializer, so server and client render the same first frame).
+    useEffect(() => {
+        setPayload(readCache(location));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [key]);
+
+    const fetcher = useCallback(async () => {
+        const data = await fetchForecast(location);
+        if (deriveAll(data) === null) {
+            throw new Error('Forecast response does not cover the current hour');
+        }
+        const savedAt = Date.now();
+        writeCache(location, savedAt, data);
+        setPayload({ key: locationKey(location), savedAt, live: true, data });
     }, [location]);
 
-    useEffect(() => {
-        refresh();
-    }, [refresh]);
+    const current = payload?.key === key ? payload : null;
+    const derived = useMemo(
+        () => (current ? deriveAll(current.data) : null),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [current, hourKey]
+    );
 
-    return { todayWeather, tomorrowWeather, currentHourWeather, refresh, error };
+    return {
+        todayWeather: derived?.todayWeather ?? null,
+        tomorrowWeather: derived?.tomorrowWeather ?? null,
+        currentHourWeather: derived?.currentHourWeather ?? null,
+        fetcher,
+        key,
+        lastSuccess: current?.savedAt ?? null,
+        fromCache: current !== null && !current.live,
+    };
 }

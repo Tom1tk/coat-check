@@ -8,8 +8,8 @@
 >
 > **Drift check (run first)**: `git log --oneline -1` → on branch
 > `advisor/015-radar-loop`, cut from `staging` **after plan 013 merged**.
-> `grep -n "radarTick" src/app/components/RainViewerBackground.tsx` → must
-> match (013's seam). `grep -n "/256/{z}/{x}/{y}/2/1_1.png"
+> `grep -n "export function useRadar" src/app/hooks/useRadar.ts` → must
+> match (013's seam: the scheduler calls `useRadar().fetcher` every 5 min). `grep -n "/256/{z}/{x}/{y}/2/1_1.png"
 > src/app/utils/radarFrames.ts` → must match. On mismatch, STOP.
 
 ## Status
@@ -17,7 +17,7 @@
 - **Priority**: P2
 - **Effort**: M
 - **Risk**: MED (rate limit: 100 requests/IP/minute; animation on a kiosk GPU)
-- **Depends on**: 013 (scheduler drives `radarTick`)
+- **Depends on**: 013 (the scheduler drives `useRadar().fetcher`)
 - **Category**: feature / rain map
 - **Planned at**: commit `d7af640`, 2026-10-17
 - **Source**: `plans/2026-10-audit.md` §3 (R2, R3)
@@ -58,8 +58,9 @@ export function frameDiff(prev: RadarFrame[], next: RadarFrame[]): { add: RadarF
   the frames whose source has `isSourceLoaded`.
 - **Loop**: 600 ms per frame, 2 s hold on the newest. One `setInterval`,
   cleared on unmount. Pause it while `document.hidden`.
-- **Update**: on each `radarTick`, refetch the index → `frameDiff` → add the new
-  frame(s), remove those that have aged out.
+- **Update**: `useRadar().fetcher` (called by 013's scheduler) refetches the
+  index and exposes `frames: RadarFrame[]` instead of one frame; the component
+  runs `frameDiff` → adds the new frame(s), removes those that have aged out.
 - **Timestamp chip**: the visible frame's time as "HH:MM" plus "−40 min" /
   "now"; plan 016 positions it beside the legend.
 - **Fallback**: the OWM path stays a single static layer (no loop).
@@ -80,6 +81,7 @@ export function frameDiff(prev: RadarFrame[], next: RadarFrame[]): { add: RadarF
 
 **In scope**:
 - `src/app/utils/radarFrames.ts` + `radarFrames.test.ts`
+- `src/app/hooks/useRadar.ts` (return all frames, keep the fallback logic)
 - `src/app/components/RainViewerBackground.tsx` (multi-frame layers, loop)
 - `src/app/components/RadarTimestamp.tsx` (create, small)
 
