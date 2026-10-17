@@ -1,6 +1,5 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { useTheme } from 'next-themes';
 import RainViewerBackground from './components/RainViewerBackground';
 import LoadingScreen from './components/LoadingScreen';
 import StatusChip from './components/StatusChip';
@@ -13,8 +12,7 @@ import { useLocation } from './hooks/useLocation';
 import { useKioskParams } from './hooks/useKioskParams';
 import { useZoom } from './hooks/useZoom';
 import { useWeather } from './hooks/useWeather';
-import { useSunCalc } from './hooks/useSunCalc';
-import { useAutoTheme } from './hooks/useAutoTheme';
+import { useMood } from './hooks/useMood';
 import { useScheduler } from './hooks/useScheduler';
 import { useRadar } from './hooks/useRadar';
 import { useClock } from './hooks/useClock';
@@ -25,6 +23,7 @@ import { panelModel } from './utils/panelModel';
 import { nextTwoHours, nowcastSummary } from './utils/nowcast';
 import { weekRibbon } from './utils/weekRibbon';
 import { burnInOffset } from './utils/burnIn';
+import { paletteFor } from './utils/moodPalettes';
 
 const formatTime = (ms: number) => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
@@ -48,9 +47,7 @@ export default function Home() {
     radar: { fetch: radar.fetcher },
   });
 
-  const { isDay } = useSunCalc(weather.forecast, now);
-  const { setTheme } = useTheme();
-  useAutoTheme(isDay, setTheme);
+  const mood = useMood(weather.forecast, now);
 
   const [panel, setPanel] = useState<HTMLElement | null>(null);
   const [ribbon, setRibbon] = useState<HTMLElement | null>(null);
@@ -103,8 +100,9 @@ export default function Home() {
         fallbackStamp={radar.fallbackStamp}
         padding={padding}
         legendTarget={legend}
+        dark={mood?.dark ?? false}
+        tint={mood ? paletteFor(mood.mood, mood.dark).tokens['map-tint'] : null}
       />
-      <div className="absolute inset-0 pointer-events-none" style={{ background: 'var(--map-tint)' }} />
 
       {!view && <LoadingScreen chip={<StatusChip status={status} />} />}
 

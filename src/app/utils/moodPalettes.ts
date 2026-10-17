@@ -147,14 +147,19 @@ const declarations = (tokens: Tokens) =>
         .map(([name, value]) => `--${name}:${value};`)
         .join('');
 
-// `:root` is board G1 (before the first forecast); each mood then overrides
-// it via `<html data-mood="…" data-dark>`, set by useMood.
+// Board G1 until the first forecast, then one block per mood, picked by
+// `<html data-mood="…" data-dark>` (useMood). Every selector outranks a bare
+// `:root`, so shadcn's `--card` in globals.css never wins, whatever the order.
 export function moodCss(): string {
     return [
-        `:root{${declarations(LIGHT_BASE)}}`,
+        `:root:not([data-mood]){${declarations(LIGHT_BASE)}}`,
         ...MOODS.map((m) => `:root[data-mood="${m}"]{${declarations(PALETTES[m].tokens)}}`),
         ...Object.entries(DARK_VARIANTS).map(
             ([m, p]) => `:root[data-mood="${m}"][data-dark]{${declarations(p!.tokens)}}`
         ),
     ].join('\n');
+}
+
+export function paletteFor(mood: Mood, dark: boolean): Palette {
+    return (dark && DARK_VARIANTS[mood]) || PALETTES[mood];
 }

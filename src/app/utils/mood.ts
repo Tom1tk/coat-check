@@ -79,3 +79,22 @@ export function stableMood(prev: MoodState, next: Mood): MoodState {
     if (count >= MOOD_CONFIRMATIONS) return { mood: next, pending: null, count: 0 };
     return { mood: prev.mood, pending: next, count };
 }
+
+export interface MoodTrack {
+    state: MoodState;
+    // The mood the forecast gave on the last evaluation, before hysteresis.
+    raw: Mood;
+}
+
+const settled = (mood: Mood): MoodState => ({ mood, pending: null, count: 0 });
+
+// One evaluation of the on-screen mood. New forecast data goes through
+// stableMood's hysteresis; when only the clock has moved (sunset, rain
+// already in the forecast coming within 3 hours) and that changes the
+// answer, the change is real and applies at once.
+export function advanceMood(prev: MoodTrack | null, raw: Mood, newData: boolean): MoodTrack {
+    if (prev === null) return { state: settled(raw), raw };
+    if (newData) return { state: stableMood(prev.state, raw), raw };
+    if (raw === prev.raw) return prev;
+    return { state: settled(raw), raw };
+}

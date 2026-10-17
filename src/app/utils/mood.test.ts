@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildForecast, HourValues } from './__fixtures__/buildForecast';
 import { isDaytime } from './forecast';
-import { getMood, isDarkMood, Mood, MoodState, stableMood } from './mood';
+import { advanceMood, getMood, isDarkMood, Mood, MoodState, stableMood } from './mood';
 
 // 2026-10-19 is a Monday; offset 0 so instants read as local time. The
 // builder's sun is up 07:00–18:00.
@@ -80,4 +80,27 @@ describe('stableMood', () => {
     it('A→B→A stays A', () => expect(feed(['rain', 'clear'])).toBe('clear'));
     it('A→B→C→C switches to C', () => expect(feed(['rain', 'storm', 'storm'])).toBe('storm'));
     it('A→B→A→B stays A', () => expect(feed(['rain', 'clear', 'rain'])).toBe('clear'));
+});
+
+describe('advanceMood', () => {
+    it('settles on the first mood at once', () => {
+        expect(advanceMood(null, 'rain', true).state.mood).toBe('rain');
+    });
+
+    it('new data needs two updates to change the mood', () => {
+        const a = advanceMood(null, 'clear', true);
+        const b = advanceMood(a, 'rain', true);
+        expect(b.state.mood).toBe('clear');
+        expect(advanceMood(b, 'rain', true).state.mood).toBe('rain');
+    });
+
+    it('an unconfirmed blip is not applied by later clock ticks', () => {
+        const blip = advanceMood(advanceMood(null, 'clear', true), 'rain', true);
+        expect(advanceMood(blip, 'rain', false).state.mood).toBe('clear');
+    });
+
+    it('the clock alone changes the mood at once (e.g. sunset)', () => {
+        const day = advanceMood(null, 'clear', true);
+        expect(advanceMood(day, 'night', false).state.mood).toBe('night');
+    });
 });
