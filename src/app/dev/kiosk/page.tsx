@@ -4,7 +4,12 @@ import { notFound, useSearchParams } from 'next/navigation';
 import fixture from '@/app/utils/__fixtures__/forecast-cambridge.json';
 import { parseForecast, parseLocal } from '@/app/utils/forecast';
 import { panelModel } from '@/app/utils/panelModel';
+import { nextTwoHours, nowcastSummary } from '@/app/utils/nowcast';
+import { weekRibbon } from '@/app/utils/weekRibbon';
 import Panel from '@/app/components/kiosk/Panel';
+import NowcastCard from '@/app/components/kiosk/NowcastCard';
+import WeekRibbon from '@/app/components/kiosk/WeekRibbon';
+import RadarTimestamp from '@/app/components/RadarTimestamp';
 import StatusChip from '@/app/components/StatusChip';
 
 // Dev-only review of the kiosk layout against the 014 fixture, no network.
@@ -18,6 +23,9 @@ function DevKiosk() {
     const dark = params.has('dark');
     const now = useMemo(() => new Date(parseLocal(at).getTime() - FORECAST.utcOffsetSeconds * 1000), [at]);
     const model = useMemo(() => panelModel(FORECAST, now), [now]);
+    const days = useMemo(() => weekRibbon(FORECAST, now), [now]);
+    const slots = useMemo(() => nextTwoHours(FORECAST, now), [now]);
+    const newest = { time: Math.floor(now.getTime() / 600_000) * 600, path: '', host: '' };
 
     return (
         <div className={`kiosk-root fixed inset-0 overflow-hidden ${dark ? 'dark' : ''}`} style={{ background: dark ? '#0b1420' : '#eceeed' }}>
@@ -27,6 +35,10 @@ function DevKiosk() {
                 place="Cambridge"
                 chip={<StatusChip status={{ tone: 'fresh', text: `Updated ${model.time}`, radarDown: false }} mood={model.mood} />}
             />
+            <NowcastCard slots={slots} summary={nowcastSummary(slots)}>
+                <RadarTimestamp frame={{ ...newest, time: newest.time - 2400 }} newest={newest} />
+            </NowcastCard>
+            <WeekRibbon days={days} />
         </div>
     );
 }
