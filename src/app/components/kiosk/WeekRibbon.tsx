@@ -1,4 +1,5 @@
 'use client';
+import type { Ref } from 'react';
 import WeatherIcon from '../WeatherIcon';
 import type { RibbonDay } from '@/app/utils/weekRibbon';
 import { u } from './units';
@@ -31,9 +32,10 @@ function marginLeft(days: RibbonDay[], i: number): string {
 }
 
 // Today + 6 days along the bottom of the screen.
-export default function WeekRibbon({ days }: { days: RibbonDay[] }) {
+export default function WeekRibbon({ days, ref }: { days: RibbonDay[]; ref?: Ref<HTMLElement> }) {
     return (
         <section
+            ref={ref}
             className="kiosk-surface"
             aria-label="Week ahead"
             style={{

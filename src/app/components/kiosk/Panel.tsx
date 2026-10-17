@@ -1,5 +1,5 @@
 'use client';
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import type { PanelModel } from '@/app/utils/panelModel';
 import Clock from './Clock';
 import LiveStats from './LiveStats';
@@ -9,9 +9,10 @@ import WindowCard from './WindowCard';
 import { u } from './units';
 
 // The left glass panel of boards G1/G2.
-export default function Panel({ model, place, chip }: { model: PanelModel; place: string; chip: ReactNode }) {
+export default function Panel({ model, place, chip, ref }: { model: PanelModel; place: string; chip: ReactNode; ref?: Ref<HTMLElement> }) {
     return (
         <section
+            ref={ref}
             className="kiosk-surface"
             aria-label="Coat forecast"
             style={{
