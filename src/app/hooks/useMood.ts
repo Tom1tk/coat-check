@@ -11,7 +11,7 @@ export interface ScreenMood {
     dark: boolean;
 }
 
-// The screen's mood for the next 3 hours, re-evaluated on each forecast
+// The screen's mood for the current hour, re-evaluated on each forecast
 // update and each clock tick. Null until there is a forecast.
 export function useMood(forecast: Forecast | null, nowMs: number): ScreenMood | null {
     const [seen, setSeen] = useState<{ forecast: Forecast | null; nowMs: number; track: MoodTrack | null }>({

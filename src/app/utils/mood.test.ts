@@ -7,11 +7,11 @@ import { advanceMood, getMood, isNight, Mood, MoodState, stableMood } from './mo
 const DAY = '2026-10-19';
 const at = (hhmm: string) => new Date(`${DAY}T${hhmm}:00Z`);
 
-// The given values for the 3 hours from 12:00 (and 21:00), mild elsewhere.
+// The given values for the 12:00 and 21:00 hours, mild elsewhere.
 const ahead = (values: Partial<HourValues>) =>
     buildForecast(DAY, {
         hour: (s) =>
-            (s >= `${DAY}T12:00` && s < `${DAY}T15:00`) || (s >= `${DAY}T21:00` && s < `${DAY}T24:00`)
+            s === `${DAY}T12:00` || s === `${DAY}T21:00`
                 ? values
                 : {},
     });
@@ -44,11 +44,11 @@ describe('getMood', () => {
         expect(getMood(ahead({ code: 71 }), at('12:10'))).toBe('rain');
     });
 
-    it('looks only 3 hours ahead', () => {
-        // Rain from 15:00 is beyond the 12:00–14:59 window.
-        const later = buildForecast(DAY, { hour: (s) => (s >= `${DAY}T15:00` ? { code: 63 } : {}) });
-        expect(getMood(later, at('12:10'))).toBe('clear');
-        expect(getMood(later, at('13:10'))).toBe('rain');
+    it('looks only at the current hour', () => {
+        // Rain from 13:00 doesn't tint the 12:00 hour.
+        const later = buildForecast(DAY, { hour: (s) => (s >= `${DAY}T13:00` ? { code: 63 } : {}) });
+        expect(getMood(later, at('12:59'))).toBe('clear');
+        expect(getMood(later, at('13:00'))).toBe('rain');
     });
 
     it('outside the forecast falls back on clear', () => {

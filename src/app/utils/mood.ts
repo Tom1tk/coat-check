@@ -3,7 +3,7 @@ import { dominant, isWet } from './coatAdvice';
 import { Forecast, isDaytime, localDate, locationNow } from './forecast';
 import { describeCode } from './weatherCodes';
 
-// The screen's tint follows the next few hours' weather (plan 017); whether
+// The screen's tint follows the current hour's weather (plan 017); whether
 // it is the day or night palette follows the sun (isDaytime), not the mood.
 export type Mood = 'clear' | 'overcast' | 'rain' | 'frost' | 'storm';
 
@@ -19,7 +19,8 @@ interface Slot {
     gusts: number;
 }
 
-// The hour containing `now` and the ones after it, clipped to the forecast.
+// The hour containing `now` (and any after it, up to MOOD_LOOKAHEAD_HOURS),
+// clipped to the forecast.
 function upcomingSlots(f: Forecast, now: Date): Slot[] {
     const local = locationNow(f.utcOffsetSeconds, now.getTime());
     const first = f.hourly.time.indexOf(`${localDate(local)}T${pad(local.getUTCHours())}:00`);
@@ -89,7 +90,7 @@ const settled = (mood: Mood): MoodState => ({ mood, pending: null, count: 0 });
 
 // One evaluation of the on-screen mood. New forecast data goes through
 // stableMood's hysteresis; when only the clock has moved (rain
-// already in the forecast coming within 3 hours) and that changes the
+// already in the forecast reaching the current hour) and that changes the
 // answer, the change is real and applies at once.
 export function advanceMood(prev: MoodTrack | null, raw: Mood, newData: boolean): MoodTrack {
     if (prev === null) return { state: settled(raw), raw };
