@@ -34,7 +34,7 @@ const toMinutes = (hhmm: string) => {
 const pad = (n: number) => String(n).padStart(2, '0');
 
 // Most frequent code; ties go to the higher (more significant) code.
-function dominant(codes: number[]): number {
+export function dominant(codes: number[]): number {
     const counts = new Map<number, number>();
     for (const code of codes) counts.set(code, (counts.get(code) ?? 0) + 1);
     let best = codes[0];

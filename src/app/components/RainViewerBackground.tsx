@@ -26,9 +26,25 @@ interface RainViewerBackgroundProps {
   padding?: MapPadding;
   // Where the radar legend chip is portalled (outside the aria-hidden map).
   legendTarget?: HTMLElement | null;
+  // The weather mood's basemap (Dark Matter when dark, else Positron) and
+  // the colour washed over it, below the radar.
+  dark?: boolean;
+  tint?: string | null;
 }
 
 const NO_PADDING: MapPadding = { top: 0, right: 0, bottom: 0, left: 0 };
+
+const POSITRON = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
+const DARK_MATTER = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+// The vendored map picks between these by theme; the theme is pinned, so
+// both slots hold the mood's basemap and a mood change swaps the style.
+const BASEMAP_STYLES = {
+  light: { light: POSITRON, dark: POSITRON },
+  dark: { light: DARK_MATTER, dark: DARK_MATTER },
+} as const;
+
+const TINT_LAYER = "mood-tint";
+const TINT_FADE_MS = 60_000;
 
 type MapInstance = NonNullable<ReturnType<typeof useMap>["map"]>;
 
@@ -121,12 +137,32 @@ function useRadarLoop(map: MapInstance | null, isLoaded: boolean, frames: RadarF
   useEffect(() => {
     if (!map || !isLoaded) return;
     return () => {
-      for (const f of onMap.current) removeFrameLayer(map, f);
+      const dropped = onMap.current;
       onMap.current = [];
       pending.current = [];
       visible.current = null;
+      for (const f of dropped) removeFrameLayer(map, f);
     };
   }, [map, isLoaded]);
+
+  // The vendored map can report the swap loaded before `setStyle` lands, so
+  // layers re-added then are diffed away; put back any that went missing.
+  useEffect(() => {
+    if (!map) return;
+    const heal = () => {
+      if (!map.isStyleLoaded()) return;
+      const lost = onMap.current.filter((f) => !map.getLayer(frameLayerId(f)));
+      for (const f of lost) ensureFrameLayer(map, f);
+      const current = visible.current;
+      if (current && lost.includes(current)) {
+        map.setPaintProperty(frameLayerId(current), "raster-opacity", RADAR_OPACITY);
+      }
+    };
+    map.on("styledata", heal);
+    return () => {
+      map.off("styledata", heal);
+    };
+  }, [map]);
 
   // Apply the latest frame list: add the newest new frame now, queue older
   // ones, drop frames that have aged out.
@@ -135,8 +171,8 @@ function useRadarLoop(map: MapInstance | null, isLoaded: boolean, frames: RadarF
     const target = frames ? (still ? frames.slice(-1) : frames) : [];
     const { add, remove } = frameDiff([...onMap.current, ...pending.current], target);
     const gone = new Set(remove.map((f) => f.path));
-    for (const f of remove) removeFrameLayer(map, f);
     onMap.current = onMap.current.filter((f) => !gone.has(f.path));
+    for (const f of remove) removeFrameLayer(map, f);
     pending.current = [...pending.current.filter((f) => !gone.has(f.path)), ...add.slice(0, -1)]
       .sort(byTime)
       .reverse();
@@ -332,6 +368,45 @@ function LocationMarker({ location }: { location: { latitude: number; longitude:
   );
 }
 
+// Washes the basemap with the mood's colour. It sits below the first radar
+// layer (\`rain-*\`), so the radar keeps its true colours, and is re-added
+// after a basemap swap drops it.
+function MoodTint({ colour }: { colour: string }) {
+  const { map } = useMap();
+
+  // Checked on every style change rather than on the map's `isLoaded`, which
+  // can flip back before a swap's `setStyle` lands (see useRadarLoop).
+  useEffect(() => {
+    if (!map) return;
+    const ensure = () => {
+      if (!map.isStyleLoaded()) return;
+      if (map.getLayer(TINT_LAYER)) {
+        map.setPaintProperty(TINT_LAYER, "background-color", colour);
+        return;
+      }
+      const radar = map.getStyle().layers.find((l) => l.id.startsWith("rain-"));
+      map.addLayer(
+        {
+          id: TINT_LAYER,
+          type: "background",
+          paint: {
+            "background-color": colour,
+            "background-color-transition": { duration: TINT_FADE_MS, delay: 0 },
+          },
+        },
+        radar?.id
+      );
+    };
+    ensure();
+    map.on("styledata", ensure);
+    return () => {
+      map.off("styledata", ensure);
+    };
+  }, [map, colour]);
+
+  return null;
+}
+
 // Reports load state upward and asks for a rebuild when the WebGL context is
 // lost and not restored (GPU reset, driver sleep) — otherwise the map stays
 // blank until a human reloads the page.
@@ -381,6 +456,8 @@ function RainViewerBackground({
   fallbackStamp,
   padding = NO_PADDING,
   legendTarget = null,
+  dark = false,
+  tint = null,
 }: RainViewerBackgroundProps): JSX.Element {
   const [mapKey, setMapKey] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -427,12 +504,10 @@ function RainViewerBackground({
         touchZoomRotate={false}
         keyboard={false}
         trackResize={true}
-        styles={{
-          light: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-          dark: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-        }}
+        styles={dark ? BASEMAP_STYLES.dark : BASEMAP_STYLES.light}
       >
         <MapWatchdog onLoadedChange={setLoaded} onRemount={remount} />
+        {tint && <MoodTint colour={tint} />}
         <RainOverlayLayer
           location={location}
           onLoaded={onLoaded}
@@ -457,7 +532,9 @@ export default React.memo(RainViewerBackground, (prevProps, nextProps) => {
     prevProps.radar === nextProps.radar &&
     prevProps.fallbackStamp === nextProps.fallbackStamp &&
     prevProps.padding === nextProps.padding &&
-    prevProps.legendTarget === nextProps.legendTarget
+    prevProps.legendTarget === nextProps.legendTarget &&
+    prevProps.dark === nextProps.dark &&
+    prevProps.tint === nextProps.tint
     // Intentionally ignoring onLoaded since it doesn't change behavior once called
   );
 });

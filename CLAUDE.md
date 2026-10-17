@@ -28,16 +28,16 @@ Deployed on Vercel at coat-check.vercel.app.
 - `app/api/rain-tiles/` — server-side tile proxy; holds the OpenWeatherMap
   key so it never reaches the client
 - `app/hooks/` — one hook per file (`useWeather` fetches Open-Meteo;
-  `useLocation` persists to localStorage; `useSunCalc` derives day/night)
+  `useLocation` persists to localStorage; `useMood` picks the weather mood)
 - `app/utils/` — pure functions (weather-code mapping, coat rules; the
   view models `panelModel`, `weekRibbon`, `nowcast`; `kioskParams`, `burnIn`)
 - `app/components/kiosk/` — the hybrid layout (boards G1/G2): `Panel` (clock,
   verdict, window cards, live stats, rain strip), `NowcastCard`, `WeekRibbon`,
   `SettingsSheet`, `Reveal`. Sizes go through `u()` (1920×1080 reference
-  pixels scaled by `--u`); colours only through the tokens in `globals.css`
+  pixels scaled by `--u`); colours only through the mood tokens (`utils/moodPalettes.ts`)
 - `app/components/` — shared pieces (`WeatherIcon`, `StatusChip`,
   `RadarTimestamp`, `LocationSearch`, the map background)
-- `app/dev/kiosk` — dev-only fixture preview (`?at=`, `?dark`, `?map`,
+- `app/dev/kiosk` — dev-only fixture preview (`?at=`, `?mood=`, `?dark`, `?map`,
   `?settings`); 404 in production
 - `components/ui/map.tsx` — VENDORED MapLibre wrapper from mapcn; do not
   edit it for app-level concerns
