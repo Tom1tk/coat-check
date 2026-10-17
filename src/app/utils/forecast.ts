@@ -181,3 +181,12 @@ export function addDays(dateISO: string, days: number): string {
     d.setUTCDate(d.getUTCDate() + days);
     return localDate(d);
 }
+
+// Day/night at the location from the forecast's own sunrise/sunset. Uses the
+// daily row for the location's current date, falling back to the first row.
+export function isDaytime(f: Forecast, now: Date): boolean {
+    const local = locationNow(f.utcOffsetSeconds, now.getTime());
+    const row = Math.max(0, f.daily.date.indexOf(localDate(local)));
+    const stamp = localStamp(local);
+    return stamp >= f.daily.sunrise[row] && stamp < f.daily.sunset[row];
+}

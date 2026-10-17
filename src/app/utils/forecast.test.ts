@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import fixture from './__fixtures__/forecast-cambridge.json';
-import { addDays, localStamp, locationNow, parseForecast, parseLocal } from './forecast';
+import { addDays, isDaytime, localStamp, locationNow, parseForecast, parseLocal } from './forecast';
+import { buildForecast } from './__fixtures__/buildForecast';
 
 function clone(): Record<string, Record<string, unknown>> {
     return JSON.parse(JSON.stringify(fixture));
@@ -67,5 +68,30 @@ describe('location-local time helpers', () => {
 
     it('addDays crosses month boundaries', () => {
         expect(addDays('2026-10-31', 1)).toBe('2026-11-01');
+    });
+});
+
+describe('isDaytime', () => {
+    // buildForecast: sunrise 07:00, sunset 18:00 every day.
+    const f = buildForecast('2026-10-19', { utcOffsetSeconds: 3600 });
+
+    it.each([
+        ['2026-10-19T05:59:00Z', false], // 06:59 local
+        ['2026-10-19T06:00:00Z', true], // 07:00 local — sunrise
+        ['2026-10-19T16:59:00Z', true], // 17:59 local
+        ['2026-10-19T17:00:00Z', false], // 18:00 local — sunset
+    ])('%s → %s', (instant, day) => {
+        expect(isDaytime(f, new Date(instant))).toBe(day);
+    });
+
+    it('uses the row for the location date, not always the first', () => {
+        const varied = { ...f, daily: { ...f.daily, sunrise: ['2026-10-19T07:00', '2026-10-20T09:00', '2026-10-21T07:00'] } };
+        expect(isDaytime(varied, new Date('2026-10-20T07:30:00Z'))).toBe(false); // 08:30 local, before 09:00
+    });
+
+    it('live Cambridge fixture flips at 18:01 BST', () => {
+        const live = parseForecast(fixture);
+        expect(isDaytime(live, new Date('2026-10-17T17:00:00Z'))).toBe(true);
+        expect(isDaytime(live, new Date('2026-10-17T17:01:00Z'))).toBe(false);
     });
 });

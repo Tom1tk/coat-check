@@ -4,13 +4,16 @@ import { useEffect, useRef } from 'react';
 // - On initial load: set theme to match isDay
 // - On sunrise/sunset transition (isDay changes): auto-switch theme
 // - Manual toggle works freely; auto-switch only triggers on actual transitions
-export function useAutoTheme(isDay: boolean, setTheme: (t: string) => void): void {
+// - Unknown (null, no forecast yet) changes nothing; a new location whose
+//   day/night differs counts as a transition once its forecast arrives
+export function useAutoTheme(isDay: boolean | null, setTheme: (t: string) => void): void {
     // Ref to track if initial auto-theme set has happened to avoid double-fades on load
     const initialThemeSet = useRef(false);
     // Track previous isDay value to detect sunrise/sunset transitions
     const prevIsDay = useRef<boolean | null>(null);
 
     useEffect(() => {
+        if (isDay === null) return;
         if (!initialThemeSet.current) {
             // Initial load: set theme to match current time
             setTheme(isDay ? 'light' : 'dark');

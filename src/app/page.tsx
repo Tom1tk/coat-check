@@ -1,6 +1,5 @@
 'use client';
 import { useEffect, useState, useMemo } from 'react';
-import SunCalc from 'suncalc';
 import { useTheme } from 'next-themes';
 import RainViewerBackground from './components/RainViewerBackground';
 import { useLocation, Location as AppLocation } from './hooks/useLocation';
@@ -24,16 +23,15 @@ export default function Home() {
   // 🌍 Location state
   const { location, updateLocation } = useLocation();
 
-  // 🕰️ Minute clock: drives sunrise/sunset checks and the hourly roll-over
+  // 🕰️ Minute clock: drives the sunrise/sunset check and the card roll-over
   const now = useClock();
-  const minuteKey = Math.floor(now / 60_000);
-
-  // ☀️ Sun/Moon Calc - recomputed every minute so the theme flips on time
-  const { isDay } = useSunCalc(location.latitude, location.longitude, minuteKey);
-  const { setTheme, resolvedTheme } = useTheme();
 
   // Weather + radar data, kept fresh by data age (no reloads, no input)
   const weather = useWeather(location, now);
+
+  // ☀️ Day/night from the forecast's sunrise/sunset, re-checked every minute
+  const { isDay } = useSunCalc(weather.forecast, now);
+  const { setTheme, resolvedTheme } = useTheme();
   const { todayWeather, tomorrowWeather, currentHourWeather } = weather;
   const radar = useRadar();
   const scheduler = useScheduler({
@@ -71,14 +69,8 @@ export default function Home() {
     setFade(true);
     // Wait for fade out to complete
     setTimeout(() => {
+      // The theme follows once the new location's forecast arrives (useAutoTheme).
       updateLocation(newLoc);
-
-      // Calculate isDay for the NEW location immediately to switch theme while hidden
-      // Note: We can't use the hook value 'isDay' here yet because 'location' state hasn't propagated to the hook re-render.
-      // Static import: a lazy chunk can 404 after a deploy in a tab that never reloads.
-      const current = new Date();
-      const times = SunCalc.getTimes(current, newLoc.latitude, newLoc.longitude);
-      setTheme(current >= times.sunrise && current < times.sunset ? 'light' : 'dark');
 
       // Wait for flyover (2000ms) + buffer (250ms)
       setTimeout(() => {
