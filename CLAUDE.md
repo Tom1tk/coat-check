@@ -38,7 +38,7 @@ Deployed on Vercel at coat-check.vercel.app.
 - `app/components/` — shared pieces (`WeatherIcon`, `StatusChip`,
   `RadarTimestamp`, `LocationSearch`, the map background)
 - `app/dev/kiosk` — dev-only fixture preview (`?at=`, `?mood=`, `?dark`, `?map`,
-  `?settings`); 404 in production
+  `?settings`, `?tomorrow`); 404 in production
 - `components/ui/map.tsx` — VENDORED MapLibre wrapper from mapcn; do not
   edit it for app-level concerns
 

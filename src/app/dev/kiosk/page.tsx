@@ -24,7 +24,7 @@ import SettingsSheet from '@/app/components/kiosk/SettingsSheet';
 // Dev-only review of the kiosk layout against the 014 fixture, no network.
 // `?at=YYYY-MM-DDTHH:MM` (location-local) fixes the clock; `?mood=<mood>`
 // previews a weather mood (otherwise the fixture's own at that time) and
-// `?dark` its night palette (otherwise the sun decides); `?map` adds the live base map (network) to check the padding; `?settings`
+// `?dark` its night palette (otherwise the sun decides); `?map` adds the live base map (network) to check the padding; `?tomorrow` starts the panel on tomorrow's cards; `?settings`
 // opens the settings sheet (also: tap the place name).
 const FORECAST = parseForecast(fixture);
 const DEFAULT_AT = FORECAST.current.time;
@@ -70,6 +70,7 @@ function DevKiosk() {
                 onOpenSettings={() => setSettings(true)}
                 chip={<StatusChip status={{ tone: 'fresh', text: `Updated ${clock12(model.time)}`, radarDown: false }} mood={model.mood} plain />}
                 portrait={portrait}
+                startOnTomorrow={params.has('tomorrow')}
             />
             {portrait ? (
                 <div ref={setBottom} style={{ position: 'absolute', left: u(20), right: u(20), bottom: u(20), display: 'flex', flexDirection: 'column', gap: u(12) }}>

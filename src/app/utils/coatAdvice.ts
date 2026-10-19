@@ -7,7 +7,7 @@ import {
     UMBRELLA_MAX_GUST_MPH,
     WET,
 } from '../config';
-import { Forecast, addDays, localDate, locationNow } from './forecast';
+import { Forecast, addDays, localDate, locationNow, parseLocal } from './forecast';
 import { describeCode } from './weatherCodes';
 
 export type WindowLabel = 'Now' | 'Out' | 'Back' | 'Day';
@@ -114,8 +114,12 @@ export function commuteDay(f: Forecast, dateISO: string): WindowSummary[] {
     ].filter((w): w is WindowSummary => w !== null);
 }
 
-// The day's windows: [Out, Back] on a weekday, its daytime [Day] on Sat/Sun.
-const dayWindows = (f: Forecast, local: Date) => (isWeekend(local) ? daytime : commuteDay)(f, localDate(local));
+// A date's windows: [Out, Back] on a weekday, its daytime [Day] on Sat/Sun.
+export function windowsOn(f: Forecast, dateISO: string): WindowSummary[] {
+    return (isWeekend(parseLocal(dateISO)) ? daytime : commuteDay)(f, dateISO);
+}
+
+const dayWindows = (f: Forecast, local: Date) => windowsOn(f, localDate(local));
 
 // Today's windows until the last one ends (Back on a weekday, the daytime at
 // a weekend), then the next day's.

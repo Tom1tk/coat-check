@@ -1,7 +1,7 @@
 import { COMMUTE, WET } from '../config';
-import { Verdict, WindowSummary, commuteWindows, currentHourSummary, verdictFor } from './coatAdvice';
+import { Verdict, WindowSummary, commuteWindows, currentHourSummary, verdictFor, windowsOn } from './coatAdvice';
 import { hour12, range12 } from './twelveHour';
-import { Forecast, localDate, localStamp, localTime, locationNow, parseLocal } from './forecast';
+import { Forecast, addDays, localDate, localStamp, localTime, locationNow, parseLocal } from './forecast';
 import { describeCode } from './weatherCodes';
 
 // Everything the left panel shows, derived from one forecast and one instant.
@@ -25,6 +25,14 @@ export interface RainHour {
     probability: number;
 }
 
+// Tomorrow's cards and rain strip, shown in place of the day's on a tap.
+export interface TomorrowView {
+    date: string; // "Tue 20 Oct"
+    cards: PanelCard[];
+    rain: RainHour[];
+    shading: { start: number; end: number }[];
+}
+
 export interface PanelModel {
     time: string; // "07:42" location-local
     date: string; // "Monday 19 October"
@@ -39,6 +47,7 @@ export interface PanelModel {
     change: { time: string; label: string } | null; // "15:00", "rain arrives"
     rain: RainHour[];
     shading: { start: number; end: number }[]; // decimal hours within the strip
+    tomorrow: TomorrowView;
 }
 
 export const STRIP_START_HOUR = 7;
@@ -111,10 +120,10 @@ export function nextChange(f: Forecast, now: Date): { time: string; label: strin
     return null;
 }
 
-function rainStrip(f: Forecast, today: string): RainHour[] {
+function rainStrip(f: Forecast, date: string): RainHour[] {
     const hours: RainHour[] = [];
     for (let h = STRIP_START_HOUR; h <= STRIP_END_HOUR; h++) {
-        const i = f.hourly.time.indexOf(`${today}T${String(h).padStart(2, '0')}:00`);
+        const i = f.hourly.time.indexOf(`${date}T${String(h).padStart(2, '0')}:00`);
         if (i !== -1) hours.push({ hour: h, probability: f.hourly.probability[i] });
     }
     return hours;
@@ -125,6 +134,23 @@ const isWeekday = (date: string) => {
     return day !== 0 && day !== 6;
 };
 
+// The commute windows shaded on a weekday's strip; none at a weekend.
+const shadingOn = (date: string) =>
+    isWeekday(date) ? [COMMUTE.out, COMMUTE.back].map((w) => ({ start: toHours(w.start), end: toHours(w.end) })) : [];
+
+const longDate = (d: Date) => `${DAY_NAMES[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+const shortDate = (d: Date) => `${DAY_NAMES[d.getUTCDay()].slice(0, 3)} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()].slice(0, 3)}`;
+
+function tomorrowView(f: Forecast, today: string): TomorrowView {
+    const date = addDays(today, 1);
+    return {
+        date: shortDate(parseLocal(date)),
+        cards: windowsOn(f, date).map((w) => card(w, today)),
+        rain: rainStrip(f, date),
+        shading: shadingOn(date),
+    };
+}
+
 export function panelModel(f: Forecast, now: Date): PanelModel {
     const local = locationNow(f.utcOffsetSeconds, now.getTime());
     const today = localDate(local);
@@ -133,7 +159,7 @@ export function panelModel(f: Forecast, now: Date): PanelModel {
 
     return {
         time: localTime(local),
-        date: `${DAY_NAMES[local.getUTCDay()]} ${local.getUTCDate()} ${MONTHS[local.getUTCMonth()]}`,
+        date: longDate(local),
         mood: describeCode(f.current.code).label,
         heading: headingFor(windows, today),
         verdict: result.verdict,
@@ -150,8 +176,7 @@ export function panelModel(f: Forecast, now: Date): PanelModel {
         },
         change: nextChange(f, now),
         rain: rainStrip(f, today),
-        shading: isWeekday(today)
-            ? [COMMUTE.out, COMMUTE.back].map((w) => ({ start: toHours(w.start), end: toHours(w.end) }))
-            : [],
+        shading: shadingOn(today),
+        tomorrow: tomorrowView(f, today),
     };
 }

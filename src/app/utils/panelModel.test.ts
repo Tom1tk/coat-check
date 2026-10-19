@@ -59,6 +59,25 @@ describe('panelModel', () => {
         expect(m.cards.map((c) => c.label)).toEqual(['Tomorrow']);
     });
 
+    it('tomorrow: the next day\'s Out/Back cards and its own rain strip', () => {
+        const { tomorrow } = panelModel(wetBack, at(`${MONDAY}T07:42`));
+        expect(tomorrow.date).toBe('Tue 20 Oct');
+        expect(tomorrow.cards.map((c) => [c.label, c.range, c.tag])).toEqual([
+            ['Out', '7:30–9:00am', 'No coat needed'],
+            ['Back', '5:00–6:30pm', 'No coat needed'],
+        ]);
+        expect(tomorrow.rain).toHaveLength(14);
+        expect(tomorrow.rain.every((h) => h.probability === 0)).toBe(true);
+        expect(tomorrow.shading).toHaveLength(2);
+    });
+
+    it('tomorrow from a Friday is Saturday\'s whole day, unshaded', () => {
+        const { tomorrow } = panelModel(wetBack, at('2026-10-23T10:00'));
+        expect(tomorrow.date).toBe('Sat 24 Oct');
+        expect(tomorrow.cards.map((c) => [c.label, c.range])).toEqual([['Tomorrow', '7am–7pm']]);
+        expect(tomorrow.shading).toEqual([]);
+    });
+
     it('live fixture (Saturday 13:30 BST) derives without throwing', () => {
         const m = panelModel(parseForecast(fixture), new Date('2026-10-17T12:30:00Z'));
         expect(m.time).toBe('13:30');
