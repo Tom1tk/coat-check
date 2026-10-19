@@ -28,7 +28,6 @@ export interface RainHour {
 // One day's cards and rain strip.
 export interface DayView {
     label: 'TODAY' | 'TOMORROW';
-    date: string; // "Tue 20 Oct"
     cards: PanelCard[];
     rain: RainHour[];
     shading: { start: number; end: number }[]; // decimal hours within the strip
@@ -138,12 +137,10 @@ const shadingOn = (date: string) =>
     isWeekday(date) ? [COMMUTE.out, COMMUTE.back].map((w) => ({ start: toHours(w.start), end: toHours(w.end) })) : [];
 
 const longDate = (d: Date) => `${DAY_NAMES[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
-const shortDate = (d: Date) => `${DAY_NAMES[d.getUTCDay()].slice(0, 3)} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()].slice(0, 3)}`;
 
 function dayView(f: Forecast, date: string, today: string, windows = windowsOn(f, date)): DayView {
     return {
         label: date === today ? 'TODAY' : 'TOMORROW',
-        date: shortDate(parseLocal(date)),
         cards: windows.map((w) => card(w, today)),
         rain: rainStrip(f, date),
         shading: shadingOn(date),

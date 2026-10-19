@@ -19,10 +19,10 @@ function barColour(probability: number): string {
 }
 
 // A day's hourly chance of rain, 07–20, with the commute windows shaded.
-export default function RainStrip({ day, hours, shading }: { day: string; hours: RainHour[]; shading: { start: number; end: number }[] }) {
+export default function RainStrip({ hours, shading }: { hours: RainHour[]; shading: { start: number; end: number }[] }) {
     return (
         <div style={{ marginTop: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: u(10) }}>
-            <div style={{ ...eyebrow, whiteSpace: 'nowrap' }}>{day} · CHANCE OF RAIN</div>
+            <div style={{ ...eyebrow, whiteSpace: 'nowrap' }}>CHANCE OF RAIN</div>
             <div style={{ position: 'relative', height: u(HEIGHT), minHeight: u(MIN_HEIGHT), flexShrink: 1 }}>
                 {shading.map((w, i) => (
                     <div

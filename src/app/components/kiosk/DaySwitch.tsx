@@ -11,10 +11,10 @@ const FADE_MS = 220;
 
 const RESET_BUTTON = { padding: 0, border: 0, background: 'none', font: 'inherit', color: 'inherit', textAlign: 'left' } as const;
 
-// The panel's day section: a line naming the day, its window cards and (in
-// landscape) its rain strip. While `shown` is today, the whole section is a
-// button that cross-fades to `next` (tomorrow) and back; the line keeps its
-// place in both, so nothing shifts but the content itself.
+// The panel's day section: a TODAY / TOMORROW line with the tap hint, the
+// window cards and (in landscape) the rain strip. While `shown` is today, the
+// whole section is a button that cross-fades to `next` (tomorrow) and back;
+// the line keeps its place in both, so nothing shifts but the content itself.
 export default function DaySwitch({
     shown,
     next,
@@ -71,9 +71,7 @@ export default function DaySwitch({
         >
             <span style={{ display: 'flex', flexDirection: 'column', gap: u(8) }}>
                 <span style={{ ...eyebrow, display: 'flex', justifyContent: 'space-between', gap: u(12), whiteSpace: 'nowrap' }}>
-                    <span style={{ color: 'var(--ink-sub)' }}>
-                        {view.label} · {view.date.toUpperCase()}
-                    </span>
+                    <span style={{ color: 'var(--ink-sub)' }}>{view.label}</span>
                     {hint && <span style={{ letterSpacing: 0, fontWeight: 400 }}>{hint}</span>}
                 </span>
                 {view.cards.length > 0 && (
@@ -84,7 +82,7 @@ export default function DaySwitch({
                     </span>
                 )}
             </span>
-            {!portrait && <RainStrip day={view.label} hours={view.rain} shading={view.shading} />}
+            {!portrait && <RainStrip hours={view.rain} shading={view.shading} />}
         </button>
     );
 }

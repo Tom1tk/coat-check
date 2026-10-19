@@ -62,7 +62,6 @@ describe('panelModel', () => {
     it('evening: the strip follows the cards to tomorrow, with nothing to tap to', () => {
         const m = panelModel(wetBack, at(`${MONDAY}T19:10`));
         expect(m.shown.label).toBe('TOMORROW');
-        expect(m.shown.date).toBe('Tue 20 Oct');
         expect(m.shown.rain.every((h) => h.probability === 0)).toBe(true);
         expect(m.next).toBeNull();
     });
@@ -71,7 +70,6 @@ describe('panelModel', () => {
         const { shown, next: tomorrow } = panelModel(wetBack, at(`${MONDAY}T07:42`));
         expect(shown.label).toBe('TODAY');
         expect(tomorrow!.label).toBe('TOMORROW');
-        expect(tomorrow!.date).toBe('Tue 20 Oct');
         expect(tomorrow!.cards.map((c) => [c.label, c.range, c.tag])).toEqual([
             ['Out', '7:30–9:00am', 'No coat needed'],
             ['Back', '5:00–6:30pm', 'No coat needed'],
@@ -83,7 +81,6 @@ describe('panelModel', () => {
 
     it('tomorrow from a Friday is Saturday\'s whole day, unshaded', () => {
         const { next: tomorrow } = panelModel(wetBack, at('2026-10-23T10:00'));
-        expect(tomorrow!.date).toBe('Sat 24 Oct');
         expect(tomorrow!.cards.map((c) => [c.label, c.range])).toEqual([['Tomorrow', '7am–7pm']]);
         expect(tomorrow!.shading).toEqual([]);
     });
