@@ -25,12 +25,13 @@ export interface RainHour {
     probability: number;
 }
 
-// Tomorrow's cards and rain strip, shown in place of the day's on a tap.
-export interface TomorrowView {
+// One day's cards and rain strip.
+export interface DayView {
+    label: 'TODAY' | 'TOMORROW';
     date: string; // "Tue 20 Oct"
     cards: PanelCard[];
     rain: RainHour[];
-    shading: { start: number; end: number }[];
+    shading: { start: number; end: number }[]; // decimal hours within the strip
 }
 
 export interface PanelModel {
@@ -42,12 +43,10 @@ export interface PanelModel {
     verdictText: string; // "Coat in bag."
     reason: string;
     umbrella: boolean;
-    cards: PanelCard[];
     stats: { temp: number; feels: number; mmNow: number; wind: number; gusts: number };
     change: { time: string; label: string } | null; // "15:00", "rain arrives"
-    rain: RainHour[];
-    shading: { start: number; end: number }[]; // decimal hours within the strip
-    tomorrow: TomorrowView;
+    shown: DayView; // the cards' day: today, or tomorrow once today's last window ends
+    next: DayView | null; // tomorrow, while `shown` is today; a tap swaps it in
 }
 
 export const STRIP_START_HOUR = 7;
@@ -141,11 +140,11 @@ const shadingOn = (date: string) =>
 const longDate = (d: Date) => `${DAY_NAMES[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
 const shortDate = (d: Date) => `${DAY_NAMES[d.getUTCDay()].slice(0, 3)} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()].slice(0, 3)}`;
 
-function tomorrowView(f: Forecast, today: string): TomorrowView {
-    const date = addDays(today, 1);
+function dayView(f: Forecast, date: string, today: string, windows = windowsOn(f, date)): DayView {
     return {
+        label: date === today ? 'TODAY' : 'TOMORROW',
         date: shortDate(parseLocal(date)),
-        cards: windowsOn(f, date).map((w) => card(w, today)),
+        cards: windows.map((w) => card(w, today)),
         rain: rainStrip(f, date),
         shading: shadingOn(date),
     };
@@ -156,6 +155,7 @@ export function panelModel(f: Forecast, now: Date): PanelModel {
     const today = localDate(local);
     const windows = commuteWindows(f, now);
     const result = verdictFor(currentHourSummary(f, now), windows);
+    const shownDate = windows[0]?.startsAt.slice(0, 10) ?? today;
 
     return {
         time: localTime(local),
@@ -166,7 +166,6 @@ export function panelModel(f: Forecast, now: Date): PanelModel {
         verdictText: VERDICT_TEXT[result.verdict],
         reason: result.umbrella ? `${result.reason} · umbrella OK` : result.reason,
         umbrella: result.umbrella,
-        cards: windows.map((w) => card(w, today)),
         stats: {
             temp: Math.round(f.current.temperature),
             feels: Math.round(f.current.feelsLike),
@@ -175,8 +174,7 @@ export function panelModel(f: Forecast, now: Date): PanelModel {
             gusts: Math.round(f.current.gusts),
         },
         change: nextChange(f, now),
-        rain: rainStrip(f, today),
-        shading: shadingOn(today),
-        tomorrow: tomorrowView(f, today),
+        shown: dayView(f, shownDate, today, windows),
+        next: shownDate === today ? dayView(f, addDays(today, 1), today) : null,
     };
 }

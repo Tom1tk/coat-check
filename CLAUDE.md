@@ -24,7 +24,8 @@ Deployed on Vercel at coat-check.vercel.app.
 ## Architecture (src/)
 
 - `app/page.tsx` — the kiosk: composes map, panel, nowcast card, week
-  ribbon and settings sheet; one boot-time `<Reveal>`, no other fades
+  ribbon and settings sheet; one boot-time `<Reveal>`; data swaps happen
+  in place (the only other fade is the day switch's tap cross-fade)
 - `app/api/rain-tiles/` — server-side tile proxy; holds the OpenWeatherMap
   key so it never reaches the client
 - `app/hooks/` — one hook per file (`useWeather` fetches Open-Meteo;
@@ -32,7 +33,8 @@ Deployed on Vercel at coat-check.vercel.app.
 - `app/utils/` — pure functions (weather-code mapping, coat rules; the
   view models `panelModel`, `weekRibbon`, `nowcast`; `kioskParams`, `burnIn`)
 - `app/components/kiosk/` — the hybrid layout (boards G1/G2): `Panel` (clock,
-  verdict, window cards, live stats, rain strip), `NowcastCard`, `WeekRibbon`,
+  verdict, live stats, and `DaySwitch`: the window cards and rain strip,
+  which a tap turns to tomorrow's), `NowcastCard`, `WeekRibbon`,
   `SettingsSheet`, `Reveal`. Sizes go through `u()` (1920×1080 reference
   pixels scaled by `--u`); colours only through the mood tokens (`utils/moodPalettes.ts`)
 - `app/components/` — shared pieces (`WeatherIcon`, `StatusChip`,

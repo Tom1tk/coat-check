@@ -23,14 +23,14 @@ describe('panelModel', () => {
         expect(m.date).toBe('Monday 19 October');
         expect(m.heading).toBe('LEAVING NOW');
         expect(m.verdictText).toBe('Coat in bag.');
-        expect(m.cards.map((c) => [c.label, c.range, c.tag, c.kind])).toEqual([
+        expect(m.shown.cards.map((c) => [c.label, c.range, c.tag, c.kind])).toEqual([
             ['Out', '7:30–9:00am', 'No coat needed', 'ok'],
             ['Back', '5:00–6:30pm', 'Coat on', 'coat'],
         ]);
-        expect(m.cards[1].line).toBe('80% · 1.2 mm · gusts 28');
-        expect(m.rain).toHaveLength(14);
-        expect(m.rain[0]).toEqual({ hour: 7, probability: 0 });
-        expect(m.shading).toEqual([
+        expect(m.shown.cards[1].line).toBe('80% · 1.2 mm · gusts 28');
+        expect(m.shown.rain).toHaveLength(14);
+        expect(m.shown.rain[0]).toEqual({ hour: 7, probability: 0 });
+        expect(m.shown.shading).toEqual([
             { start: 7.5, end: 9 },
             { start: 17, end: 18.5 },
         ]);
@@ -42,47 +42,57 @@ describe('panelModel', () => {
     });
 
     it('weekday cards give the coldest feels-like', () => {
-        expect(panelModel(wetBack, at(`${MONDAY}T07:42`)).cards[0].sub).toBe('feels 16°');
+        expect(panelModel(wetBack, at(`${MONDAY}T07:42`)).shown.cards[0].sub).toBe('feels 16°');
     });
 
     it('weekend: one whole-day card and no commute shading', () => {
         const m = panelModel(wetBack, at('2026-10-24T10:00'));
         expect(m.heading).toBe('TODAY');
-        expect(m.cards.map((c) => [c.label, c.range])).toEqual([['Today', '7am–7pm']]);
-        expect(m.cards[0].sub).toMatch(/^low -?\d+°$/);
-        expect(m.shading).toEqual([]);
+        expect(m.shown.cards.map((c) => [c.label, c.range])).toEqual([['Today', '7am–7pm']]);
+        expect(m.shown.cards[0].sub).toMatch(/^low -?\d+°$/);
+        expect(m.shown.shading).toEqual([]);
     });
 
     it('weekend evening looks at tomorrow\'s day', () => {
         const m = panelModel(wetBack, at('2026-10-24T19:30'));
         expect(m.heading).toBe('TOMORROW');
-        expect(m.cards.map((c) => c.label)).toEqual(['Tomorrow']);
+        expect(m.shown.cards.map((c) => c.label)).toEqual(['Tomorrow']);
+    });
+
+    it('evening: the strip follows the cards to tomorrow, with nothing to tap to', () => {
+        const m = panelModel(wetBack, at(`${MONDAY}T19:10`));
+        expect(m.shown.label).toBe('TOMORROW');
+        expect(m.shown.date).toBe('Tue 20 Oct');
+        expect(m.shown.rain.every((h) => h.probability === 0)).toBe(true);
+        expect(m.next).toBeNull();
     });
 
     it('tomorrow: the next day\'s Out/Back cards and its own rain strip', () => {
-        const { tomorrow } = panelModel(wetBack, at(`${MONDAY}T07:42`));
-        expect(tomorrow.date).toBe('Tue 20 Oct');
-        expect(tomorrow.cards.map((c) => [c.label, c.range, c.tag])).toEqual([
+        const { shown, next: tomorrow } = panelModel(wetBack, at(`${MONDAY}T07:42`));
+        expect(shown.label).toBe('TODAY');
+        expect(tomorrow!.label).toBe('TOMORROW');
+        expect(tomorrow!.date).toBe('Tue 20 Oct');
+        expect(tomorrow!.cards.map((c) => [c.label, c.range, c.tag])).toEqual([
             ['Out', '7:30–9:00am', 'No coat needed'],
             ['Back', '5:00–6:30pm', 'No coat needed'],
         ]);
-        expect(tomorrow.rain).toHaveLength(14);
-        expect(tomorrow.rain.every((h) => h.probability === 0)).toBe(true);
-        expect(tomorrow.shading).toHaveLength(2);
+        expect(tomorrow!.rain).toHaveLength(14);
+        expect(tomorrow!.rain.every((h) => h.probability === 0)).toBe(true);
+        expect(tomorrow!.shading).toHaveLength(2);
     });
 
     it('tomorrow from a Friday is Saturday\'s whole day, unshaded', () => {
-        const { tomorrow } = panelModel(wetBack, at('2026-10-23T10:00'));
-        expect(tomorrow.date).toBe('Sat 24 Oct');
-        expect(tomorrow.cards.map((c) => [c.label, c.range])).toEqual([['Tomorrow', '7am–7pm']]);
-        expect(tomorrow.shading).toEqual([]);
+        const { next: tomorrow } = panelModel(wetBack, at('2026-10-23T10:00'));
+        expect(tomorrow!.date).toBe('Sat 24 Oct');
+        expect(tomorrow!.cards.map((c) => [c.label, c.range])).toEqual([['Tomorrow', '7am–7pm']]);
+        expect(tomorrow!.shading).toEqual([]);
     });
 
     it('live fixture (Saturday 13:30 BST) derives without throwing', () => {
         const m = panelModel(parseForecast(fixture), new Date('2026-10-17T12:30:00Z'));
         expect(m.time).toBe('13:30');
         expect(m.date).toBe('Saturday 17 October');
-        expect(m.cards).toHaveLength(1);
+        expect(m.shown.cards).toHaveLength(1);
     });
 });
 
