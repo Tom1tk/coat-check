@@ -421,7 +421,12 @@ function MoodTint({ colour }: { colour: string }) {
     const ensure = () => {
       if (!map.isStyleLoaded()) return;
       if (map.getLayer(TINT_LAYER)) {
-        map.setPaintProperty(TINT_LAYER, "background-color", colour);
+        // Only on a real change: every setPaintProperty re-runs label
+        // placement, whose fade ends in another `idle`, so re-setting the same
+        // colour here repainted the map ~19 times a second, forever.
+        if (map.getPaintProperty(TINT_LAYER, "background-color") !== colour) {
+          map.setPaintProperty(TINT_LAYER, "background-color", colour);
+        }
         return;
       }
       // A new layer transitions from the paint default (black), so it goes
